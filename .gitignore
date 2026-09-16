@@ -4,9 +4,9 @@
 #   to the repo. Find the link in README.md.
 *.onnx
 
-# Directories for input dataset and output images
+# Directories and files for input and output
 input/
-output/
+*output*
 
 # Byte-compiled / optimized / DLL files
 __pycache__/
