@@ -1,3 +1,13 @@
+# Pre-trained model, format used by YuNet
+#   Must be downloaded and placed in predictor/ for facial
+#   region extracting to function but should NOT be pushed
+#   to the repo. Find the link in README.md.
+*.onnx
+
+# Directories and files for input and output
+input/
+*output*
+
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[codz]
