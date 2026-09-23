@@ -2,4 +2,7 @@ pandas
 scikit-learn
 torchvision
 tqdm
+
 opencv-python
+matplotlib
+shap
