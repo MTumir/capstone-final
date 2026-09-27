@@ -44,7 +44,17 @@ parser.add_argument('-o', '--output', type=str, default='output', help='path to 
 parser.add_argument('-f', '--feature', type=str, help='feature to extract. must be \'all\', \'eyes\', \'nose\', or \'mouth\'')
 parser.add_argument('-iS', '--input_size', type=int, default=320, help='height and width of provided images.')
 parser.add_argument('-oS', '--output_size', type=int, default=32, help='distance from center in pixels for extracted images. i.e. \'32\' would return 64x64 features.')
+parser.add_argument('-m', '--model_path', type=str, default='face_detection_yunet_2026may.onnx', help='path to YuNet onnx file.')
 args = parser.parse_args()
+
+print(f'Running {Path(__file__).name} with arguments:')
+print(f'\tInput = {args.input}')
+print(f'\tOutput = {args.output}')
+print(f'\tFeature = {args.feature}')
+print(f'\tInput Size = {args.input_size}')
+print(f'\tOutput Size = {args.output_size}')
+print(f'\tModel Path = {args.model_path}')
+print()
 
 if args.feature != "all" and args.feature != "eyes" and args.feature != "nose" and args.feature != "mouth":
     print('Must provide feature: \'all\', \'eyes\', \'nose\', or \'mouth\'')
@@ -77,7 +87,7 @@ for dir in input_dir_list:
 
 # Initialize YuNet detector.
 detector = cv.FaceDetectorYN.create(
-    'face_detection_yunet_2026may.onnx',  # model
+    args.model_path,                      # model
     "",                                   # config
     (args.input_size, args.input_size),   # input_size
     0.85,                                 # score_threshold

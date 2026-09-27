@@ -9,7 +9,12 @@ import random
 import shutil
 from pathlib import Path
 from typing import Iterable, Sequence
+import cv2 as cv
 
+import sys
+import os
+sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '../../face_region_extractor/')))
+from runtime_facial_region_extractor import *
 
 def create_train_test_split(
         src_root: str | Path,
@@ -129,6 +134,8 @@ def balance(dist, percent_real, src1, src2, dst, age_min=5, age_max=70):
     src1 = Path(src1)
     src2 = Path(src2)
     dst = Path(dst)
+
+    fre = FacialRegionExtractor(model_path='../../face_detection_yunet_2026may.onnx')
 
     ages = list(range(age_min, age_max + 1))
     rng = random.Random(42)
@@ -257,12 +264,16 @@ def balance(dist, percent_real, src1, src2, dst, age_min=5, age_max=70):
         selected_fake = fake_pool[:n_fake]
 
         for src_path in selected_real:
+            img = fre.process_image(0, str(src_path))
             dst_path = age_dir / src_path.name
-            shutil.copy2(src_path, dst_path)
+            if img is not None: cv.imwrite(dst_path, img)
+            # shutil.copy2(src_path, dst_path)
 
         for src_path in selected_fake:
+            img = fre.process_image(0, str(src_path))
             dst_path = age_dir / src_path.name
-            shutil.copy2(src_path, dst_path)
+            if img is not None: cv.imwrite(dst_path, img)
+            # shutil.copy2(src_path, dst_path)
 
     total_real_used = sum(best_result["real_used"].values())
     total_fake_used = sum(best_result["fake_used"].values())
