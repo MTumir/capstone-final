@@ -67,7 +67,7 @@ class FacialRegionExtractor:
         )
 
     def process_image(self, feature, input) -> np.ndarray | None:
-        """Returns the next image in self.input_list, cropped to feature.
+        """Returns the input image, cropped to feature.
 
         Args:
             feature (int): The feature to be extracted.
@@ -75,7 +75,7 @@ class FacialRegionExtractor:
                 1 = Left Eye
                 2 = Nose
                 3 = Mouth
-            increment (int): Increments self.index if 1, does not if 0.
+            input (str): Path to image to be cropped.
 
         Returns:
             np.ndarray: NumPy array representing the cropped image.
