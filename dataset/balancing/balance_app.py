@@ -118,7 +118,7 @@ def create_train_test_split(
         print(f"{age:3d} | {available:9d} | {target:6d} | {actual_test:11d} | {actual_train:12d}")
 
 
-def balance(dist, percent_real, src1, src2, dst, age_min=5, age_max=70):
+def balance(dist, percent_real, feature, src1, src2, dst, age_min=5, age_max=70):
     percent_real = float(percent_real) / 100
     if dist == "US Population":
         dist = pickle.load(open("stats.pkl", "rb"))['us24']
@@ -131,11 +131,16 @@ def balance(dist, percent_real, src1, src2, dst, age_min=5, age_max=70):
     elif dist == "Centered Normal (mean 21)":
         dist = pickle.load(open("stats.pkl", "rb"))['21']
 
+    if feature == "Right Eye": feature = 0
+    elif feature == "Left Eye": feature = 1
+    elif feature == "Nose": feature = 2
+    elif feature == "Mouth": feature = 3
+
     src1 = Path(src1)
     src2 = Path(src2)
     dst = Path(dst)
 
-    fre = FacialRegionExtractor(model_path='../../face_detection_yunet_2026may.onnx')
+    fre = FacialRegionExtractor(model_path='face_detection_yunet_2026may.onnx')
 
     ages = list(range(age_min, age_max + 1))
     rng = random.Random(42)
@@ -264,16 +269,14 @@ def balance(dist, percent_real, src1, src2, dst, age_min=5, age_max=70):
         selected_fake = fake_pool[:n_fake]
 
         for src_path in selected_real:
-            img = fre.process_image(0, str(src_path))
+            img = fre.process_image(feature, str(src_path))
             dst_path = age_dir / src_path.name
             if img is not None: cv.imwrite(dst_path, img)
-            # shutil.copy2(src_path, dst_path)
 
         for src_path in selected_fake:
-            img = fre.process_image(0, str(src_path))
+            img = fre.process_image(feature, str(src_path))
             dst_path = age_dir / src_path.name
             if img is not None: cv.imwrite(dst_path, img)
-            # shutil.copy2(src_path, dst_path)
 
     total_real_used = sum(best_result["real_used"].values())
     total_fake_used = sum(best_result["fake_used"].values())
@@ -302,7 +305,8 @@ def main():
     def process_user_inputs():
         dist = dist_combobox.get()
         percent_real = percent_real_var.get()
-        balance(dist, percent_real, src1, src2, dst)
+        feature = feature_combobox.get()
+        balance(dist, percent_real, feature, src1, src2, dst)
 
     tk.Label(root, text="Distribution").pack(anchor="w", padx=30)
     dist_combobox = ttk.Combobox(root, values=["Uniform", "US Population", "Centered Normal (mean 13)", "Centered Normal (mean 15)", "Centered Normal (mean 18)", "Centered Normal (mean 21)"])
@@ -318,6 +322,11 @@ def main():
         textvariable=percent_real_var,
     )
     spinbox.pack(padx=30, fill="x")
+
+    tk.Label(root, text="Desired Feature").pack(anchor="w", padx=30)
+    feature_combobox = ttk.Combobox(root, values=["Right Eye", "Left Eye", "Nose", "Mouth"])
+    feature_combobox.set("Right Eye")
+    feature_combobox.pack(padx=30, fill="x")
 
     tk.Label(root, text="Real Source").pack(anchor="w", padx=30)
     real_source_entry = tk.Label(root)
