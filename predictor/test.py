@@ -194,7 +194,7 @@ def singlepred(filepath, modelpath):
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument('-c', '--input_csv', type=str, default='csv_builder_output/data.csv', help='path to input csv (from csv_builder.py).')
-    parser.add_argument('-p', '--input_pth', type=str, default='train_output/model.pth', help='path to output pth.')
+    parser.add_argument('-p', '--input_pth', type=str, default='train_output/model.pth', help='path to input pth (from train.py).')
     args = parser.parse_args()
 
     print(f'Running test.py with arguments:')
