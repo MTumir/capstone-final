@@ -66,7 +66,7 @@ def shap_analysis(input, output, input_csv, input_pth, max_evals=500, batch_size
                 prediction = model(image)
                 # probabilities = torch.nn.functional.softmax(prediction, dim=1)
                 # confidence, _ = torch.max(probabilities, dim=1)
-                confidence, _ = torch.max(prediction)
+                confidence, _ = torch.max(prediction, dim=1)
                 scores.append(confidence)
         return np.array(scores)
 
