@@ -79,14 +79,11 @@ def shap_analysis(input, output, input_csv, input_pth, max_evals=500, batch_size
     for sample in sample_list:
         image, image_name, age = sample
         shap_values = explainer(np.array([image]), max_evals=max_evals, batch_size=batch_size)
-        
-        shap.image_plot(shap_values)
-        exit(0)
 
-        # shap.image_plot(shap_values, show=False)
-        # plt.savefig(f'{args.output}/{age}/{image_name}')
-        # plt.close()
-        # print(f'Saved plot of age {age} ({image_name})')
+        shap.image_plot(shap_values, show=False)
+        plt.savefig(f'{args.output}/{age}/{image_name}')
+        plt.close()
+        print(f'Saved plot of age {age} ({image_name})')
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
