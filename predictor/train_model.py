@@ -1,3 +1,5 @@
+import argparse
+
 import os
 import pandas as pd
 import torch
@@ -21,9 +23,6 @@ NUM_WORKERS = 4
 DEVICE = "cuda" if torch.cuda.is_available() else "cpu"
 PIN_MEMORY = True
 
-CSV_PATH = "./synthetic_csv/styleganPopulation80.csv"
-SAVE_PATH = "best_models_synth/styleganPopulation80.pth"
-
 def get_transforms():
     train_tf = transforms.Compose([
         transforms.Resize((IMAGE_SIZE, IMAGE_SIZE)),
@@ -36,12 +35,12 @@ def get_transforms():
     ])
     return train_tf
 
-def run():
+def run(csv_path='csv_builder_output/data.csv', save_path='train_output/model.pth'):
     print("Device:", DEVICE)
 
     train_tf = get_transforms()
 
-    train_ds = AgeDataset(CSV_PATH, transform=train_tf)
+    train_ds = AgeDataset(csv_path, transform=train_tf)
 
     train_loader = DataLoader(
         train_ds, batch_size=BATCH_SIZE, shuffle=True,
@@ -90,9 +89,19 @@ def run():
     "image_size": IMAGE_SIZE,
     "max_age": MAX_AGE,
     "min_age": MIN_AGE,},
-    SAVE_PATH)
-    print(f"Saved best checkpoint -> {SAVE_PATH}")
+    save_path)
+    print(f"Saved best checkpoint -> {save_path}")
 
 
 if __name__ == "__main__":
-    run()
+    parser = argparse.ArgumentParser()
+    parser.add_argument('-i', '--input_csv', type=str, default='csv_builder_output/data.csv', help='path to input csv (from csv_builder.py).')
+    parser.add_argument('-o', '--output_pth', type=str, default='train_output/model.pth', help='path to output pth.')
+    args = parser.parse_args()
+
+    print(f'Running train.py with arguments:')
+    print(f'\tInput CSV = {args.input_csv}')
+    print(f'\tOutput PTH = {args.output_pth}')
+    print()
+
+    run(args.input_csv, args.output_pth)
