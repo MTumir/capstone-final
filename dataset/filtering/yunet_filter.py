@@ -9,8 +9,6 @@ def yunet_filter(input, output, score_threshold, model_path):
     bad_count = 0
 
     # Prepare input directories.
-    # NOTE - This assumes that only fake images are intended
-    #   to be filtered out.
     input_path = Path(f'{input}')
     fake_list = list(input_path.glob('*/*'))
     input_list = fake_list
