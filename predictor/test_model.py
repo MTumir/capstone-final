@@ -1,3 +1,5 @@
+import argparse
+
 import os
 from collections import defaultdict
 import csv
@@ -190,6 +192,14 @@ def singlepred(filepath, modelpath):
 
 
 if __name__ == '__main__':
-    csv_path = "./synthetic_csv/uniformTest.csv"
-    model_path = "./best_models_synth/uniform70.pth"
-    eval(csv_path, model_path, age_thresholds=(13, 15, 18, 21), output_dir="./eval_outputs_uniform70_stylegan")
+    parser = argparse.ArgumentParser()
+    parser.add_argument('-c', '--input_csv', type=str, default='csv_builder_output/data.csv', help='path to input csv (from csv_builder.py).')
+    parser.add_argument('-p', '--input_pth', type=str, default='train_output/model.pth', help='path to input pth (from train.py).')
+    args = parser.parse_args()
+
+    print(f'Running test.py with arguments:')
+    print(f'\tInput CSV = {args.input_csv}')
+    print(f'\tInput PTH = {args.input_pth}')
+    print()
+
+    eval(args.input_csv, args.input_pth, age_thresholds=(13, 15, 18, 21), output_dir="./eval_outputs_uniform70_stylegan")
