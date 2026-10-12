@@ -1,4 +1,5 @@
-﻿import random
+﻿import argparse
+import random
 from multiprocessing.spawn import freeze_support
 from pathlib import Path
 
@@ -19,13 +20,11 @@ def weights_init(m):
         nn.init.normal_(m.weight.data, 1.0, 0.02)
         nn.init.constant_(m.bias.data, 0)
 
-def main():
-    seed = 42
+def train_filterer(input, output, seed):
     random.seed(seed)
     torch.manual_seed(seed)
     torch.use_deterministic_algorithms(True)
 
-    dataroot = "dataset/sort"
     image_size = 64
     num_channels = 3
     batch_size = 128
@@ -34,7 +33,7 @@ def main():
     workers = 2
     device = torch.device("cuda:0" if (torch.cuda.is_available() and num_gpus > 0) else "cpu")
 
-    dataset = dset.ImageFolder(root=dataroot,
+    dataset = dset.ImageFolder(root=input,
                                transform=transforms.Compose([
                                    transforms.Resize(image_size),
                                    transforms.CenterCrop(image_size),
@@ -52,7 +51,7 @@ def main():
     criterion = nn.BCELoss()
     optimizer = optim.Adam(classifier.parameters())
 
-    ckpt_path = Path("checkpoints/best_classifier3.pt")
+    ckpt_path = Path(output)
     ckpt_path.parent.mkdir(parents=True, exist_ok=True)
 
     best_loss = float("inf")
@@ -63,8 +62,8 @@ def main():
             classifier.zero_grad()
             inputs = data[0].to(device)
             labels = data[1].type(torch.FloatTensor).to(device)
-            output = classifier(inputs).view(-1)
-            err = criterion(output, labels)
+            out = classifier(inputs).view(-1)
+            err = criterion(out, labels)
             running_loss += err * inputs.size(0)
             num_inputs += inputs.size(0)
             err.backward()
@@ -91,5 +90,17 @@ def main():
 
 
 if __name__ == '__main__':
+    parser = argparse.ArgumentParser()
+    parser.add_argument('-i', '--input', type=str, default='input/', help='dataroot of input images.')
+    parser.add_argument('-o', '--output', type=str, default='train_out.pt', help='path to output directory.')
+    parser.add_argument('-s', '--seed', type=int, default=67, help='seed for setting internal state.')
+    args = parser.parse_args()
+
+    print(f'Running train.py with arguments:')
+    print(f'\tInput = {args.input}')
+    print(f'\tOutput = {args.output}')
+    print(f'\tSeed = {args.seed}')
+    print()
+
     freeze_support()
-    main()
+    train_filterer(args.input, args.output, args.seed)

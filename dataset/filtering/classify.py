@@ -1,4 +1,5 @@
-﻿import shutil
+﻿import argparse
+import shutil
 from pathlib import Path
 
 import torch
@@ -7,7 +8,7 @@ from PIL import Image
 
 from model import Classifier
 
-THRESHOLD = 0.5
+THRESHOLD = 0.98
 IMAGE_SIZE = 64
 NUM_CHANNELS = 3
 NGPU = 1
@@ -62,3 +63,19 @@ def classify_images(input_dir: Path, output_dir: Path, model_dir: str, subdir0: 
                 print(f"Skipped {img_path}: {e}")
 
     print("Done.")
+
+if __name__ == "__main__":
+    parser = argparse.ArgumentParser()
+    parser.add_argument('-i', '--input_dir', type=str, default='input/', help='path to input directory.')
+    parser.add_argument('-o', '--output_dir', type=str, default='classify_out/', help='path to output directory.')
+    parser.add_argument('-m', '--model_path', type=str, default='dataset/filtering/trained_models/stage3.pt', help='path to input pth.')
+    args = parser.parse_args()
+
+    print(f'Running classify.py with arguments:')
+    print(f'\tInput = {args.input_dir}')
+    print(f'\tOutput = {args.output_dir}')
+    print(f'\tModel = {args.model_path}')
+    print()
+
+    classify_images(Path(args.input_dir), Path(args.output_dir), args.model_path,
+                    "rejected", "accepted")
