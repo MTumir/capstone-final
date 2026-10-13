@@ -204,12 +204,14 @@ class FacialRegionExtractor:
 
 if __name__ == "__main__":
     fre = FacialRegionExtractor(input='input')
-    # for i in range(0,5):
-    #     cv.imshow("img", fre.next_processed_image(feature=5))
-    #     cv.waitKey(0)
-    input = 'input\\real\\population_split\\test\\40\\2069.jpg'
-    img = cv.imread(input)
-    cv.imshow("img", img)
+    input = 'input\\real\\population_split\\test\\35\\8301.jpg'
+    img_original = cv.imread(input)
+    cv.imshow('img_original', img_original)
     cv.waitKey(0)
-    cv.imshow("img2", fre.process_image(feature=5, input=input))
-    cv.waitKey(0)
+    feature_count = 6
+    for i in range(0, feature_count):
+        img = fre.process_image(feature=i, input=input)
+        cv.imshow(f'img_feature_{i}', img)
+        cv.imwrite(f'test/img_feature_{i}.jpg', img)
+        cv.waitKey(0)
+
