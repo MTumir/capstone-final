@@ -75,6 +75,8 @@ class FacialRegionExtractor:
                 1 = Left Eye
                 2 = Nose
                 3 = Mouth
+                4 = Forehead
+                5 = Cheek
             input (str): Path to image to be cropped.
 
         Returns:
@@ -113,7 +115,7 @@ class FacialRegionExtractor:
         y_lcm = int(face[1][0][13])     # left mouth corner, y
 
         # Snip image to only requested feature, then return the image.
-        if feature == 0:
+        if feature == 0:        # Right Eye
             y_start, y_end = y_re - self.output_size, y_re + self.output_size
             x_start, x_end = x_re - self.output_size, x_re + self.output_size
             y_start, y_end, x_start, x_end = adjust_coordinates(self.input_size, 
@@ -122,7 +124,7 @@ class FacialRegionExtractor:
             print(f'\tReturning right eye image')
             return right_eye_img
 
-        if feature == 1:
+        if feature == 1:        # Left Eye
             y_start, y_end = y_le - self.output_size, y_le + self.output_size
             x_start, x_end = x_le - self.output_size, x_le + self.output_size
             y_start, y_end, x_start, x_end = adjust_coordinates(self.input_size, 
@@ -131,7 +133,7 @@ class FacialRegionExtractor:
             print(f'\tReturning left eye image')
             return left_eye_img
 
-        if feature == 2:
+        if feature == 2:        # Nose
             y_start, y_end = y_nt - self.output_size, y_nt + self.output_size
             x_start, x_end = x_nt - self.output_size, x_nt + self.output_size
             y_start, y_end, x_start, x_end = adjust_coordinates(self.input_size, 
@@ -140,7 +142,7 @@ class FacialRegionExtractor:
             print(f'\tReturning nose image')
             return nose_img
             
-        if feature == 3:
+        if feature == 3:        # Mouth
             y_center = int((y_rcm + y_lcm) / 2)
             x_center = int((x_rcm + x_lcm) / 2)
             y_start, y_end = y_center - self.output_size, y_center + self.output_size
@@ -150,6 +152,30 @@ class FacialRegionExtractor:
             mouth_img = img[y_start:y_end, x_start:x_end]
             print(f'\tReturning mouth image')
             return mouth_img
+
+        if feature == 4:        # Forehead
+            y_start, y_end = int(y1 - (h / 30)), int(y_re - (h / 7))
+            x_start, x_end = int(x_re - (w / 10)), int(x_le + (w / 10))
+            y_center, x_center = int((y_start + y_end) / 2), int((x_start + x_end) / 2)
+            height_mult, width_mult = int(self.output_size * 0.75), int(self.output_size * 1.25)
+            y_start, y_end = y_center - height_mult, y_center + height_mult
+            x_start, x_end = x_center - width_mult, x_center + width_mult
+            y_start, y_end, x_start, x_end = adjust_coordinates(self.input_size, 
+                                                                y_start, y_end, x_start, x_end)
+            print(y1, y_re)
+            print(y_start, y_end, x_start, x_end)
+            forehead_img = img[y_start:y_end, x_start:x_end]
+            print(f'\tReturning forehead image')
+            return forehead_img
+
+        if feature == 5:        # Cheek
+            y_start, y_end = y_nt - self.output_size, y_nt + self.output_size
+            x_start, x_end = x_nt - self.output_size, x_nt + self.output_size
+            y_start, y_end, x_start, x_end = adjust_coordinates(self.input_size, 
+                                                                y_start, y_end, x_start, x_end)
+            nose_img = img[y_start:y_end, x_start:x_end]
+            print(f'\tReturning nose image')
+            return nose_img
 
     def next_processed_image(self, feature, increment=1) -> np.ndarray | None:
         """Returns the next image in self.input_list, cropped to feature.
@@ -200,7 +226,7 @@ class FacialRegionExtractor:
         y_lcm = int(face[1][0][13])     # left mouth corner, y
 
         # Snip image to only requested feature, then return the image.
-        if feature == 0:
+        if feature == 0:        # Right Eye
             y_start, y_end = y_re - self.output_size, y_re + self.output_size
             x_start, x_end = x_re - self.output_size, x_re + self.output_size
             y_start, y_end, x_start, x_end = adjust_coordinates(self.input_size, 
@@ -209,7 +235,7 @@ class FacialRegionExtractor:
             print(f'\tReturning right eye image')
             return right_eye_img
 
-        if feature == 1:
+        if feature == 1:        # Left Eye
             y_start, y_end = y_le - self.output_size, y_le + self.output_size
             x_start, x_end = x_le - self.output_size, x_le + self.output_size
             y_start, y_end, x_start, x_end = adjust_coordinates(self.input_size, 
@@ -218,7 +244,7 @@ class FacialRegionExtractor:
             print(f'\tReturning left eye image')
             return left_eye_img
 
-        if feature == 2:
+        if feature == 2:        # Nose
             y_start, y_end = y_nt - self.output_size, y_nt + self.output_size
             x_start, x_end = x_nt - self.output_size, x_nt + self.output_size
             y_start, y_end, x_start, x_end = adjust_coordinates(self.input_size, 
@@ -227,7 +253,7 @@ class FacialRegionExtractor:
             print(f'\tReturning nose image')
             return nose_img
             
-        if feature == 3:
+        if feature == 3:        # Mouth
             y_center = int((y_rcm + y_lcm) / 2)
             x_center = int((x_rcm + x_lcm) / 2)
             y_start, y_end = y_center - self.output_size, y_center + self.output_size
@@ -238,8 +264,34 @@ class FacialRegionExtractor:
             print(f'\tReturning mouth image')
             return mouth_img
 
+        if feature == 4:        # Forehead
+            y_start, y_end = int(y1 - (h / 30)), int(y_re - (h / 7))
+            x_start, x_end = int(x_re - (w / 10)), int(x_le + (w / 10))
+            y_center, x_center = int((y_start + y_end) / 2), int((x_start + x_end) / 2)
+            height_mult, width_mult = int(self.output_size * 0.75), int(self.output_size * 1.25)
+            y_start, y_end = y_center - height_mult, y_center + height_mult
+            x_start, x_end = x_center - width_mult, x_center + width_mult
+            y_start, y_end, x_start, x_end = adjust_coordinates(self.input_size, 
+                                                                y_start, y_end, x_start, x_end)
+            print(y1, y_re)
+            print(y_start, y_end, x_start, x_end)
+            forehead_img = img[y_start:y_end, x_start:x_end]
+            print(f'\tReturning forehead image')
+            return forehead_img
+
+        if feature == 5:        # Cheek
+            y_start, y_end = y_nt - self.output_size, y_nt + self.output_size
+            x_start, x_end = x_nt - self.output_size, x_nt + self.output_size
+            y_start, y_end, x_start, x_end = adjust_coordinates(self.input_size, 
+                                                                y_start, y_end, x_start, x_end)
+            cheek_img = img[y_start:y_end, x_start:x_end]
+            print(f'\tReturning cheek image')
+            return cheek_img
+
 if __name__ == "__main__":
     fre = FacialRegionExtractor(input='input')
-    for i in range(0,5):
-        cv.imshow("img", fre.next_processed_image(feature=0))
-        cv.waitKey(0)
+    # for i in range(0,5):
+    #     cv.imshow("img", fre.next_processed_image(feature=4))
+    #     cv.waitKey(0)
+    cv.imshow("img", fre.process_image(feature=4, input='input\\real\\population_split\\test\\40\\2347.jpg'))
+    cv.waitKey(0)
