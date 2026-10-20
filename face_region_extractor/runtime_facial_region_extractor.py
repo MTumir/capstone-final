@@ -145,8 +145,9 @@ class FacialRegionExtractor:
         if feature == 3:        # Mouth
             y_center = int((y_rcm + y_lcm) / 2)
             x_center = int((x_rcm + x_lcm) / 2)
-            y_start, y_end = y_center - self.output_size, y_center + self.output_size
-            x_start, x_end = x_center - self.output_size, x_center + self.output_size
+            normalized_height, normalized_width = int(self.output_size * 0.75), int(self.output_size * 1.25)
+            y_start, y_end = y_center - normalized_height, y_center + normalized_height
+            x_start, x_end = x_center - normalized_width, x_center + normalized_width
             y_start, y_end, x_start, x_end = adjust_coordinates(self.input_size, 
                                                                 y_start, y_end, x_start, x_end)
             mouth_img = img[y_start:y_end, x_start:x_end]
@@ -154,7 +155,7 @@ class FacialRegionExtractor:
             return mouth_img
 
         if feature == 4:        # Forehead
-            y_center = int((y1 - (h / 30) + y_re - (h / 7)) / 2)
+            y_center = int((y1 - (h / 50) + y_re - (h / 20)) / 2)
             x_center = int((x_re - (w / 10) + x_le + (w / 10)) / 2)
             normalized_height, normalized_width = int(self.output_size * 0.75), int(self.output_size * 1.25)
             y_start, y_end = y_center - normalized_height, y_center + normalized_height
