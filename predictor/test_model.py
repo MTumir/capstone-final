@@ -30,15 +30,15 @@ trans = transforms.Compose([
 ])
 
 
-def load_model(model_p):
+def load_model(model_p, effnet_index):
     save_model = torch.load(model_p, map_location=DEVICE)
-    model = build_model().to(DEVICE)
+    model = build_model(effnet_index).to(DEVICE)
     model.load_state_dict(save_model["model_state_dict"])
     model.eval()
     return model
 
 
-def eval(csv_path, modelp, age_thresholds=(18,), output_dir="./eval_outputs"):
+def eval(csv_path, modelp, effnet_index, age_thresholds=(18,), output_dir="./eval_outputs"):
     os.makedirs(output_dir, exist_ok=True)
 
     evaluation_dataset = AgeDataset(csv_path, transform=trans)
@@ -51,7 +51,7 @@ def eval(csv_path, modelp, age_thresholds=(18,), output_dir="./eval_outputs"):
         pin_memory=True
     )
 
-    model = load_model(modelp)
+    model = load_model(modelp, effnet_index)
 
     errors = []
     errors_by_age = defaultdict(list)
@@ -195,11 +195,16 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument('-c', '--input_csv', type=str, default='csv_builder_output/data.csv', help='path to input csv (from csv_builder.py).')
     parser.add_argument('-p', '--input_pth', type=str, default='train_output/model.pth', help='path to input pth (from train.py).')
+    parser.add_argument('-e', '--effnet_index', type=int, default=0, help='index of EfficientNet model.')
+    parser.add_argument('-o', '--output_dir', type=str, default='test_output/', help='directory for output.')
     args = parser.parse_args()
 
     print(f'Running test.py with arguments:')
     print(f'\tInput CSV = {args.input_csv}')
     print(f'\tInput PTH = {args.input_pth}')
+    print(f'\tModel = EfficientNetB{args.effnet_index}')
+    print(f'\tOutput Dir = {args.output_dir}')
     print()
 
-    eval(args.input_csv, args.input_pth, age_thresholds=(13, 15, 18, 21), output_dir="./eval_outputs_uniform70_stylegan")
+    eval(args.input_csv, args.input_pth, args.effnet_index,
+        age_thresholds=(13, 15, 18, 21), output_dir=args.output_dir)
