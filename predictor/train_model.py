@@ -35,7 +35,7 @@ def get_transforms():
     ])
     return train_tf
 
-def run(csv_path='csv_builder_output/data.csv', save_path='train_output/model.pth'):
+def run(csv_path='csv_builder_output/data.csv', save_path='train_output/model.pth', effnet_index=0):
     print("Device:", DEVICE)
 
     train_tf = get_transforms()
@@ -47,7 +47,7 @@ def run(csv_path='csv_builder_output/data.csv', save_path='train_output/model.pt
         num_workers=NUM_WORKERS, pin_memory=PIN_MEMORY
     )
 
-    model = build_model().to(DEVICE)
+    model = build_model(effnet_index).to(DEVICE)
 
     criterion = nn.L1Loss()
     optimizer = torch.optim.AdamW(model.parameters(), lr=LR)
@@ -97,11 +97,13 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument('-i', '--input_csv', type=str, default='csv_builder_output/data.csv', help='path to input csv (from csv_builder.py).')
     parser.add_argument('-o', '--output_pth', type=str, default='train_output/model.pth', help='path to output pth.')
+    parser.add_argument('-e', '--effnet_index', type=int, default=0, help='index of EfficientNet model.')
     args = parser.parse_args()
 
     print(f'Running train.py with arguments:')
     print(f'\tInput CSV = {args.input_csv}')
     print(f'\tOutput PTH = {args.output_pth}')
+    print(f'\tModel = EfficientNetB{args.effnet_index}')
     print()
 
-    run(args.input_csv, args.output_pth)
+    run(args.input_csv, args.output_pth, args.effnet_index)

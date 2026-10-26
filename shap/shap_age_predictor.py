@@ -23,7 +23,7 @@ AGE_RANGE = MAX_AGE - MIN_AGE
 IMAGE_SIZE = 128
 BATCH_SIZE = 32
 
-def shap_analysis(input, output, input_csv, input_pth, max_evals=500, batch_size=50):
+def shap_analysis(input, output, input_pth, max_evals=500, batch_size=50):
     # Prepare output directories.
     output_dir = Path(output)
     if not output_dir.is_dir():
@@ -39,8 +39,7 @@ def shap_analysis(input, output, input_csv, input_pth, max_evals=500, batch_size
     sample_list = []
     for dir in input_list:
         files = [f for f in dir.iterdir() if f.is_file()]
-        # for i in range(0,15):
-        for i in range(0,1):
+        for i in range(0,15):
             image = random.choice(files)
             image_name = image.name
             age = image.parent.name
@@ -64,8 +63,6 @@ def shap_analysis(input, output, input_csv, input_pth, max_evals=500, batch_size
                 image = trans(image).unsqueeze(0).to(DEVICE)
 
                 prediction = model(image)
-                # probabilities = torch.nn.functional.softmax(prediction, dim=1)
-                # confidence, _ = torch.max(probabilities, dim=1)
                 confidence, _ = torch.max(prediction, dim=1)
                 scores.append(confidence)
         return np.array(scores)
