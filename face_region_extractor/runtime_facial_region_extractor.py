@@ -2,6 +2,7 @@ from pathlib import Path
 
 import numpy as np
 import cv2 as cv
+from PIL import Image
 
 def adjust_coordinates(input_size, y_start, y_end, x_start, x_end) -> tuple[int, int, int, int]:
     """Adjusts coordinates so that no points are out of bounds.
@@ -37,6 +38,136 @@ def adjust_coordinates(input_size, y_start, y_end, x_start, x_end) -> tuple[int,
         new_x_end -= shift
     return new_y_start, new_y_end, new_x_start, new_x_end
 
+def process_image(yunet, feature, input, input_size = 320, output_size = 32) -> np.ndarray | None:
+    """Returns the input image, cropped to feature.
+
+    Args:
+        feature (int): The feature to be extracted.
+            0 = Right Eye
+            1 = Left Eye
+            2 = Nose
+            3 = Mouth
+            4 = Forehead
+            5 = Cheek
+        input (str): Image to be cropped.
+
+    Returns:
+        np.ndarray: NumPy array representing the cropped image.
+        None: Nothing, if the image could not be read.
+    """
+
+    img = cv.resize(input, (input_size, input_size))
+    width, height, _ = img.shape
+    yunet.setInputSize((height, width))
+
+    # Run image through YuNet for face detection.
+    face = yunet.detect(img)
+    if face[1] is None: return None
+    x1 = int(face[1][0][0])         # top-left coordinate, x
+    y1 = int(face[1][0][1])         # top-left coordinate, y
+    w = int(face[1][0][2])          # width of face
+    h = int(face[1][0][3])          # height of face
+    x_re = int(face[1][0][4])       # right eye, x
+    y_re = int(face[1][0][5])       # right eye, y
+    x_le = int(face[1][0][6])       # left eye, x
+    y_le = int(face[1][0][7])       # left eye, y
+    x_nt = int(face[1][0][8])       # nose tip, x
+    y_nt = int(face[1][0][9])       # nose tip, y
+    x_rcm = int(face[1][0][10])     # right mouth corner, x
+    y_rcm = int(face[1][0][11])     # right mouth corner, y
+    x_lcm = int(face[1][0][12])     # left mouth corner, x
+    y_lcm = int(face[1][0][13])     # left mouth corner, y
+
+    # Snip image to only requested feature, then return the image.
+    if feature == 0:        # Right Eye
+        y_start, y_end = y_re - output_size, y_re + output_size
+        x_start, x_end = x_re - output_size, x_re + output_size
+        y_start, y_end, x_start, x_end = adjust_coordinates(input_size, 
+                                                            y_start, y_end, x_start, x_end)
+        right_eye_img = img[y_start:y_end, x_start:x_end]
+        print(f'\tReturning right eye image')
+        return right_eye_img
+
+    if feature == 1:        # Left Eye
+        y_start, y_end = y_le - output_size, y_le + output_size
+        x_start, x_end = x_le - output_size, x_le + output_size
+        y_start, y_end, x_start, x_end = adjust_coordinates(input_size, 
+                                                            y_start, y_end, x_start, x_end)
+        left_eye_img = img[y_start:y_end, x_start:x_end]
+        print(f'\tReturning left eye image')
+        return left_eye_img
+
+    if feature == 2:        # Nose
+        y_start, y_end = y_nt - output_size, y_nt + output_size
+        x_start, x_end = x_nt - output_size, x_nt + output_size
+        y_start, y_end, x_start, x_end = adjust_coordinates(input_size, 
+                                                            y_start, y_end, x_start, x_end)
+        nose_img = img[y_start:y_end, x_start:x_end]
+        print(f'\tReturning nose image')
+        return nose_img
+        
+    if feature == 3:        # Mouth
+        y_center = int((y_rcm + y_lcm) / 2)
+        x_center = int((x_rcm + x_lcm) / 2)
+        normalized_height, normalized_width = int(output_size * 0.75), int(output_size * 1.25)
+        y_start, y_end = y_center - normalized_height, y_center + normalized_height
+        x_start, x_end = x_center - normalized_width, x_center + normalized_width
+        y_start, y_end, x_start, x_end = adjust_coordinates(input_size, 
+                                                            y_start, y_end, x_start, x_end)
+        mouth_img = img[y_start:y_end, x_start:x_end]
+        print(f'\tReturning mouth image')
+        return mouth_img
+
+    if feature == 4:        # Forehead
+        y_center = int((y1 - (h / 50) + y_re - (h / 20)) / 2)
+        x_center = int((x_re - (w / 10) + x_le + (w / 10)) / 2)
+        normalized_height, normalized_width = int(output_size * 0.75), int(output_size * 1.25)
+        y_start, y_end = y_center - normalized_height, y_center + normalized_height
+        x_start, x_end = x_center - normalized_width, x_center + normalized_width
+        y_start, y_end, x_start, x_end = adjust_coordinates(input_size, 
+                                                            y_start, y_end, x_start, x_end)
+        forehead_img = img[y_start:y_end, x_start:x_end]
+        print(f'\tReturning forehead image')
+        return forehead_img
+
+    if feature == 5:        # Cheek
+        y_center = int((y_rcm + y_lcm) / 2)
+        x2 = x1 + w
+        if x_rcm - x1 > x2 - x_lcm: # If right cheek is bigger
+            x_center = int((x_rcm + x1) / 2)
+        else:                       # If left cheek is bigger
+            x_center = int((x2 + x_lcm) / 2)
+        y_start, y_end = y_center - output_size, y_center + output_size
+        x_start, x_end = x_center - output_size, x_center + output_size
+        y_start, y_end, x_start, x_end = adjust_coordinates(input_size, 
+                                                            y_start, y_end, x_start, x_end)
+        cheek_img = img[y_start:y_end, x_start:x_end]
+        print(f'\tReturning cheek image')
+        return cheek_img
+
+class FacialRegionWrapper:
+    """Wrapper for easy facial region extraction via __call__(). 
+        Used for feature extraction in train/test scripts."""
+    
+    INPUT_SIZE = 320
+    OUTPUT_SIZE = 32
+
+    def __init__(self, yunet, feature):
+        self.yunet = yunet
+        self.feature = feature
+
+    def __call__(self, image):
+        bgr = cv.cvtColor(np.array(image.convert('RGB')), cv.COLOR_RGB2BGR)
+        
+        extracted_feature = process_image(self.yunet, self.feature, bgr,
+                               input_size=self.INPUT_SIZE, output_size=self.OUTPUT_SIZE)
+        
+        if extracted_feature is None or extracted_feature.size == 0:
+            print('FacialRegionWrapper could not find feature!')
+            return image
+        
+        return Image.fromarray(cv.cvtColor(extracted_feature, cv.COLOR_BGR2RGB))
+
 class FacialRegionExtractor:
     """Class for handling facial region extraction from images.
 
@@ -66,7 +197,31 @@ class FacialRegionExtractor:
             5000                                  # top_k
         )
 
-    def process_image(self, feature, input) -> np.ndarray | None:
+    # def __call__(self, img: np.ndarray, feature):
+    #     return self.process_image(feature, img)
+
+    def process_image_preset(self, feature, input) -> np.ndarray | None:
+        """Returns the input image, cropped to feature.
+
+        Args:
+            feature (int): The feature to be extracted.
+                0 = Right Eye
+                1 = Left Eye
+                2 = Nose
+                3 = Mouth
+                4 = Forehead
+                5 = Cheek
+            input (str): Image to be cropped.
+
+        Returns:
+            np.ndarray: NumPy array representing the cropped image.
+            None: Nothing, if the image could not be read.
+        """
+
+        return process_image(self.yunet, feature, input,
+                             self.input_size, self.output_size)
+
+    def process_image_from_path(self, feature, input) -> np.ndarray | None:
         """Returns the input image, cropped to feature.
 
         Args:
@@ -92,94 +247,7 @@ class FacialRegionExtractor:
             print(f'\t{img} not read as numpy.ndarray, returning.')
             return None
 
-        img = cv.resize(img, (self.input_size, self.input_size))
-        width, height, _ = img.shape
-        self.yunet.setInputSize((height, width))
-
-        # Run image through YuNet for face detection.
-        face = self.yunet.detect(img)
-        if face[1] is None: return None
-        x1 = int(face[1][0][0])         # top-left coordinate, x
-        y1 = int(face[1][0][1])         # top-left coordinate, y
-        w = int(face[1][0][2])          # width of face
-        h = int(face[1][0][3])          # height of face
-        x_re = int(face[1][0][4])       # right eye, x
-        y_re = int(face[1][0][5])       # right eye, y
-        x_le = int(face[1][0][6])       # left eye, x
-        y_le = int(face[1][0][7])       # left eye, y
-        x_nt = int(face[1][0][8])       # nose tip, x
-        y_nt = int(face[1][0][9])       # nose tip, y
-        x_rcm = int(face[1][0][10])     # right mouth corner, x
-        y_rcm = int(face[1][0][11])     # right mouth corner, y
-        x_lcm = int(face[1][0][12])     # left mouth corner, x
-        y_lcm = int(face[1][0][13])     # left mouth corner, y
-
-        # Snip image to only requested feature, then return the image.
-        if feature == 0:        # Right Eye
-            y_start, y_end = y_re - self.output_size, y_re + self.output_size
-            x_start, x_end = x_re - self.output_size, x_re + self.output_size
-            y_start, y_end, x_start, x_end = adjust_coordinates(self.input_size, 
-                                                                y_start, y_end, x_start, x_end)
-            right_eye_img = img[y_start:y_end, x_start:x_end]
-            print(f'\tReturning right eye image')
-            return right_eye_img
-
-        if feature == 1:        # Left Eye
-            y_start, y_end = y_le - self.output_size, y_le + self.output_size
-            x_start, x_end = x_le - self.output_size, x_le + self.output_size
-            y_start, y_end, x_start, x_end = adjust_coordinates(self.input_size, 
-                                                                y_start, y_end, x_start, x_end)
-            left_eye_img = img[y_start:y_end, x_start:x_end]
-            print(f'\tReturning left eye image')
-            return left_eye_img
-
-        if feature == 2:        # Nose
-            y_start, y_end = y_nt - self.output_size, y_nt + self.output_size
-            x_start, x_end = x_nt - self.output_size, x_nt + self.output_size
-            y_start, y_end, x_start, x_end = adjust_coordinates(self.input_size, 
-                                                                y_start, y_end, x_start, x_end)
-            nose_img = img[y_start:y_end, x_start:x_end]
-            print(f'\tReturning nose image')
-            return nose_img
-            
-        if feature == 3:        # Mouth
-            y_center = int((y_rcm + y_lcm) / 2)
-            x_center = int((x_rcm + x_lcm) / 2)
-            normalized_height, normalized_width = int(self.output_size * 0.75), int(self.output_size * 1.25)
-            y_start, y_end = y_center - normalized_height, y_center + normalized_height
-            x_start, x_end = x_center - normalized_width, x_center + normalized_width
-            y_start, y_end, x_start, x_end = adjust_coordinates(self.input_size, 
-                                                                y_start, y_end, x_start, x_end)
-            mouth_img = img[y_start:y_end, x_start:x_end]
-            print(f'\tReturning mouth image')
-            return mouth_img
-
-        if feature == 4:        # Forehead
-            y_center = int((y1 - (h / 50) + y_re - (h / 20)) / 2)
-            x_center = int((x_re - (w / 10) + x_le + (w / 10)) / 2)
-            normalized_height, normalized_width = int(self.output_size * 0.75), int(self.output_size * 1.25)
-            y_start, y_end = y_center - normalized_height, y_center + normalized_height
-            x_start, x_end = x_center - normalized_width, x_center + normalized_width
-            y_start, y_end, x_start, x_end = adjust_coordinates(self.input_size, 
-                                                                y_start, y_end, x_start, x_end)
-            forehead_img = img[y_start:y_end, x_start:x_end]
-            print(f'\tReturning forehead image')
-            return forehead_img
-
-        if feature == 5:        # Cheek
-            y_center = int((y_rcm + y_lcm) / 2)
-            x2 = x1 + w
-            if x_rcm - x1 > x2 - x_lcm: # If right cheek is bigger
-                x_center = int((x_rcm + x1) / 2)
-            else:                       # If left cheek is bigger
-                x_center = int((x2 + x_lcm) / 2)
-            y_start, y_end = y_center - self.output_size, y_center + self.output_size
-            x_start, x_end = x_center - self.output_size, x_center + self.output_size
-            y_start, y_end, x_start, x_end = adjust_coordinates(self.input_size, 
-                                                                y_start, y_end, x_start, x_end)
-            cheek_img = img[y_start:y_end, x_start:x_end]
-            print(f'\tReturning cheek image')
-            return cheek_img
+        return self.process_image_preset(feature, img)
 
     def next_processed_image(self, feature, increment=1) -> np.ndarray | None:
         """Returns the next image in self.input_list, cropped to feature.
@@ -201,18 +269,52 @@ class FacialRegionExtractor:
 
         image_path = self.input_list[self.index]
         if increment: self.index += 1
-        return self.process_image(feature=feature, input=image_path)
+        return self.process_image_from_path(feature=feature, input=image_path)
 
 if __name__ == "__main__":
-    fre = FacialRegionExtractor(input='input')
+    # fre = FacialRegionExtractor(input='input')
+    # input = 'input\\real\\population_split\\test\\35\\8301.jpg'
+    # img_original = cv.imread(input)
+    # cv.imshow('img_original', img_original)
+    # cv.waitKey(0)
+    # feature_count = 6
+    # for i in range(0, feature_count):
+    #     img = fre.process_image_from_path(feature=i, input=input)
+    #     cv.imshow(f'img_feature_{i}', img)
+    #     cv.imwrite(f'test/img_feature_{i}.jpg', img)
+    #     cv.waitKey(0)
+
+    # fre = FacialRegionExtractor()
+    # feature_count = 6
+    # input = 'input\\real\\population_split\\test\\35\\8301.jpg'
+    # img = cv.imread(input)
+    # for i in range(0, feature_count):
+    #     curr_img = fre(img, i)
+    #     cv.imshow(f'img_feature_{i}', curr_img)
+    #     cv.imwrite(f'test/img_feature_{i}.jpg', curr_img)
+    #     cv.waitKey(0)
+
+    yunet = cv.FaceDetectorYN.create(
+        'face_detection_yunet_2026may.onnx',  # model
+        "",                                   # config
+        (32, 32),                             # input_size
+        0.85,                                 # score_threshold
+        0.3,                                  # nms_threshold
+        5000                                  # top_k
+    )
     input = 'input\\real\\population_split\\test\\35\\8301.jpg'
     img_original = cv.imread(input)
     cv.imshow('img_original', img_original)
     cv.waitKey(0)
     feature_count = 6
-    for i in range(0, feature_count):
-        img = fre.process_image(feature=i, input=input)
-        cv.imshow(f'img_feature_{i}', img)
-        cv.imwrite(f'test/img_feature_{i}.jpg', img)
-        cv.waitKey(0)
 
+    rgb_image = cv.cvtColor(img_original, cv.COLOR_BGR2RGB)
+    pil_image = Image.fromarray(rgb_image)
+
+    for i in range(0, feature_count):
+        # img = process_image(yunet=yunet, feature=i, input=img_original)
+        frw = FacialRegionWrapper(yunet, i)
+        frw(pil_image)
+        # cv.imshow(f'img_feature_{i}', img)
+        # cv.imwrite(f'test/img_feature_{i}.jpg', img)
+        # cv.waitKey(0)
