@@ -197,9 +197,6 @@ class FacialRegionExtractor:
             5000                                  # top_k
         )
 
-    # def __call__(self, img: np.ndarray, feature):
-    #     return self.process_image(feature, img)
-
     def process_image_preset(self, feature, input) -> np.ndarray | None:
         """Returns the input image, cropped to feature.
 
