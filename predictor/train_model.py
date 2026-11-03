@@ -19,7 +19,7 @@ import sys
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '../face_region_extractor/')))
 from runtime_facial_region_extractor import FacialRegionWrapper
 
-IMAGE_SIZE = 128
+IMAGE_SIZE = 32
 BATCH_SIZE = 64
 EPOCHS = 10
 LR = 3e-4

@@ -2,12 +2,24 @@ import argparse
 from pathlib import Path
 
 import os
+import cv2 as cv
 import pandas as pd
+
+import sys
+sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '../face_region_extractor/')))
+from runtime_facial_region_extractor import FacialRegionExtractor
 
 minAge = 5
 maxAge = 70
 
+YUNET_INPUT_SIZE = 320
+YUNET_SCORE_THRESHOLD = 0.85
+
 def build_csv(input_dir, output_csv):
+    fre = FacialRegionExtractor()
+    good_samples = 0
+    bad_samples = 0
+
     listRows = []
     output_dir = Path(output_csv).parent
     if not output_dir.is_dir():
@@ -22,10 +34,13 @@ def build_csv(input_dir, output_csv):
             files.append(os.path.join(path, file))
 
         for file_path in files:
-            listRows.append({
-                "file_path": file_path,
-                "age": age
-            })
+            if fre.process_image_from_path(0, file_path) is not None:
+                good_samples += 1
+                listRows.append({
+                    "file_path": file_path,
+                    "age": age
+                })
+            else: bad_samples += 1
 
     df = pd.DataFrame(listRows)
     df.to_csv(output_csv, index=False)
@@ -35,6 +50,8 @@ def build_csv(input_dir, output_csv):
     print(f'Entries in CSV: {len(df)}')
     print(f'Minimum Age: {min(df["age"])}')
     print(f'Maximum Age: {max(df["age"])}')
+    print(f'Good Samples: {good_samples}')
+    print(f'Bad Samples: {bad_samples}')
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
