@@ -27,8 +27,9 @@ NUM_WORKERS = 0
 
 IMAGE_SIZE = 128
 BATCH_SIZE = 32
-YUNET_SIZE = 320
-DETECT_THRESHOLD = 0.85
+
+YUNET_INPUT_SIZE = 320
+YUNET_SCORE_THRESHOLD = 0.85
 
 def get_test_transforms(yunet, feature):
     return transforms.Compose([
@@ -54,8 +55,8 @@ def eval(csv_path, modelp, effnet_index, feature, age_thresholds=(18,), output_d
     yunet = cv.FaceDetectorYN.create(
         'face_detection_yunet_2026may.onnx',  # model
         "",                                   # config
-        (YUNET_SIZE, YUNET_SIZE),             # input_size
-        DETECT_THRESHOLD,                     # score_threshold
+        (YUNET_INPUT_SIZE, YUNET_INPUT_SIZE), # input_size
+        YUNET_SCORE_THRESHOLD,                # score_threshold
         0.3,                                  # nms_threshold
         5000                                  # top_k
     )

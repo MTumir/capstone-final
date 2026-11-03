@@ -29,9 +29,9 @@ AGE_RANGE = MAX_AGE - MIN_AGE
 NUM_WORKERS = 0
 DEVICE = "cuda" if torch.cuda.is_available() else "cpu"
 PIN_MEMORY = True
-YUNET_SIZE = 320
-DETECT_SIZE = 128
-DETECT_THRESHOLD = 0.85
+
+YUNET_INPUT_SIZE = 320
+YUNET_SCORE_THRESHOLD = 0.85
 
 def get_training_transforms(yunet, feature):
     return transforms.Compose([
@@ -58,24 +58,31 @@ def get_validation_transforms(yunet, feature):
                              std=[0.229, 0.224, 0.225]),
     ])
 
-def run(csv_path='csv_builder_output/data.csv', save_path='train_output/model.pth', effnet_index=0, feature=0):
+def run(train_csv='csv_builder_output/train.csv', validation_csv='csv_builder_output/validation.csv', 
+        save_path='train_output/model.pth', effnet_index=0, feature=0):
     print("Device:", DEVICE)
 
     yunet = cv.FaceDetectorYN.create(
         'face_detection_yunet_2026may.onnx',  # model
         "",                                   # config
-        (YUNET_SIZE, YUNET_SIZE),             # input_size
-        DETECT_THRESHOLD,                     # score_threshold
+        (YUNET_INPUT_SIZE, YUNET_INPUT_SIZE), # input_size
+        YUNET_SCORE_THRESHOLD,                # score_threshold
         0.3,                                  # nms_threshold
         5000                                  # top_k
     )
 
     train_tf = get_training_transforms(yunet, feature)
+    validation_tf = get_validation_transforms(yunet, feature)
 
-    train_ds = AgeDataset(csv_path, transform=train_tf)
+    train_ds = AgeDataset(train_csv, transform=train_tf)
+    validation_ds = AgeDataset(validation_csv, transform=validation_tf)
 
     train_loader = DataLoader(
         train_ds, batch_size=BATCH_SIZE, shuffle=True,
+        num_workers=NUM_WORKERS, pin_memory=PIN_MEMORY
+    )
+    validation_loader = DataLoader(
+        validation_ds, batch_size=BATCH_SIZE, shuffle=False,
         num_workers=NUM_WORKERS, pin_memory=PIN_MEMORY
     )
 
@@ -92,6 +99,7 @@ def run(csv_path='csv_builder_output/data.csv', save_path='train_output/model.pt
     for epoch in range(1, EPOCHS + 1):
         print(f"\nEpoch {epoch}/{EPOCHS}")
 
+        print('Training...')
         model.train()
         running_loss = 0.0
 
@@ -112,6 +120,31 @@ def run(csv_path='csv_builder_output/data.csv', save_path='train_output/model.pt
 
         train_loss = running_loss / max(1, len(train_loader))
         print(f"Train loss (normalized MAE): {train_loss:.4f}")
+
+        scheduler.step()
+        print("LR:", scheduler.get_last_lr()[0])
+
+        print('Evaluating...')
+        model.eval()
+        running_loss = 0.0
+
+        for images, ages in tqdm(validation_loader, desc="validation"):
+            images = images.to(DEVICE, non_blocking=True)
+            ages = ages.to(DEVICE, non_blocking=True).unsqueeze(1)
+
+            optimizer.zero_grad(set_to_none=True)
+            with torch.amp.autocast("cuda", enabled=use_amp):
+                preds = model(images)
+                loss = criterion(preds, ages)
+
+            scaler.scale(loss).backward()
+            scaler.step(optimizer)
+            scaler.update()
+
+            running_loss += loss.item()
+
+        validation_loss = running_loss / max(1, len(validation_loader))
+        print(f"Validation loss (normalized MAE): {validation_loss:.4f}")
 
         scheduler.step()
         print("LR:", scheduler.get_last_lr()[0])
@@ -142,4 +175,5 @@ if __name__ == "__main__":
     print(f'\tOutput PTH = {args.output_pth}')
     print()
 
-    run(args.train_csv, args.output_pth, args.effnet_index, args.feature)
+    run(args.train_csv, args.validation_csv,
+        args.output_pth, args.effnet_index, args.feature)
