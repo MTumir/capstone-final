@@ -1,5 +1,8 @@
+import argparse
 import os
 import csv
+
+import cv2 as cv
 import numpy as np
 import torch
 from torch.utils.data import DataLoader
@@ -8,36 +11,40 @@ from tqdm import tqdm
 
 from dataset import AgeDataset
 from model import build_model
+from test_model import get_test_transforms, load_model
 
 DEVICE = 'cuda' if torch.cuda.is_available() else 'cpu'
-
 MIN_AGE = 5
 MAX_AGE = 70
 AGE_RANGE = MAX_AGE - MIN_AGE
-
 IMAGE_SIZE = 128
 BATCH_SIZE = 32
 
-trans = transforms.Compose([
-    transforms.Resize((IMAGE_SIZE, IMAGE_SIZE)),
-    transforms.ToTensor(),
-    transforms.Normalize(mean=[0.485, 0.456, 0.406],
-                         std=[0.229, 0.224, 0.225]),
-])
+YUNET_INPUT_SIZE = 320
+YUNET_SCORE_THRESHOLD = 0.85
+
+# def load_model(model_p):
+#     save_model = torch.load(model_p, map_location=DEVICE)
+#     model = build_model().to(DEVICE)
+#     model.load_state_dict(save_model["model_state_dict"])
+#     model.eval()
+#     return model
 
 
-def load_model(model_p):
-    save_model = torch.load(model_p, map_location=DEVICE)
-    model = build_model().to(DEVICE)
-    model.load_state_dict(save_model["model_state_dict"])
-    model.eval()
-    return model
-
-
-def eval(csv_path, modelp, threshold=18, output_dir="./eval_outputs"):
+def eval(input_csv, input_pth, effnet_index, feature, threshold=18, output_dir="./eval_outputs"):
     os.makedirs(output_dir, exist_ok=True)
 
-    evaluation_dataset = AgeDataset(csv_path, transform=trans)
+    yunet = cv.FaceDetectorYN.create(
+        'face_detection_yunet_2026may.onnx',  # model
+        "",                                   # config
+        (YUNET_INPUT_SIZE, YUNET_INPUT_SIZE), # input_size
+        YUNET_SCORE_THRESHOLD,                # score_threshold
+        0.3,                                  # nms_threshold
+        5000                                  # top_k
+    )
+
+    test_tf = get_test_transforms(yunet, feature)
+    evaluation_dataset = AgeDataset(input_csv, transform=test_tf)
 
     loader = DataLoader(
         evaluation_dataset,
@@ -47,7 +54,7 @@ def eval(csv_path, modelp, threshold=18, output_dir="./eval_outputs"):
         pin_memory=True
     )
 
-    model = load_model(modelp)
+    model = load_model(input_pth, effnet_index)
 
     actual = []
     predicted = []
@@ -124,6 +131,21 @@ def eval(csv_path, modelp, threshold=18, output_dir="./eval_outputs"):
 
 
 if __name__ == '__main__':
-    csv_path = "./synthetic_csv/uniformTest.csv"
-    model_path = "./best_models_synth/sam90u18.pt"
-    eval(csv_path, model_path, threshold=18, output_dir="./eval_outputs_u18_sam90")
+    parser = argparse.ArgumentParser()
+    parser.add_argument('-c', '--input_csv', type=str, default='csv_builder_output/data.csv', help='path to input csv (from csv_builder.py).')
+    parser.add_argument('-p', '--input_pth', type=str, default='train_output/model.pth', help='path to input pth (from train.py).')
+    parser.add_argument('-e', '--effnet_index', type=int, default=0, help='index of EfficientNet model.')
+    parser.add_argument('-f', '--feature', type=int, default=0, help='feature to be extracted.')
+    parser.add_argument('-o', '--output_dir', type=str, default='test_output/', help='directory for output.')
+    args = parser.parse_args()
+
+    print(f'Running test_binary.py with arguments:')
+    print(f'\tInput CSV = {args.input_csv}')
+    print(f'\tInput PTH = {args.input_pth}')
+    print(f'\tModel = EfficientNetB{args.effnet_index}')
+    print(f'\tFeature = {args.feature}')
+    print(f'\tOutput Dir = {args.output_dir}')
+    print()
+
+    eval(args.input_csv, args.input_pth, args.effnet_index, args.feature,
+        threshold=18, output_dir=args.output_dir)

@@ -104,7 +104,7 @@ if __name__ == "__main__":
     parser.add_argument('-o', '--output_pth', type=str, default='train_output/model.pth', help='path to output pth.')
     args = parser.parse_args()
 
-    print(f'Running train_model.py with arguments:')
+    print(f'Running train_binary.py with arguments:')
     print(f'\tTraining CSV = {args.train_csv}')
     print(f'\tValidation CSV = {args.validation_csv}')
     print(f'\tModel = EfficientNetB{args.effnet_index}')
