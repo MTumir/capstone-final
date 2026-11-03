@@ -1,16 +1,23 @@
 import argparse
 
 import os
+import numpy as np
 import pandas as pd
+from PIL import Image
 import torch
 import torch.nn as nn
 from torch.utils.data import DataLoader
 from torchvision import transforms
 from sklearn.model_selection import train_test_split
 from tqdm import tqdm
+import cv2 as cv
 
 from dataset import AgeDataset
 from model import build_model
+
+import sys
+sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '../face_region_extractor/')))
+from runtime_facial_region_extractor import FacialRegionWrapper
 
 IMAGE_SIZE = 128
 BATCH_SIZE = 64
@@ -19,12 +26,16 @@ LR = 3e-4
 MIN_AGE = 5
 MAX_AGE = 70
 AGE_RANGE = MAX_AGE - MIN_AGE
-NUM_WORKERS = 4
+NUM_WORKERS = 0
 DEVICE = "cuda" if torch.cuda.is_available() else "cpu"
 PIN_MEMORY = True
+YUNET_SIZE = 320
+DETECT_SIZE = 128
+DETECT_THRESHOLD = 0.85
 
-def get_transforms():
-    train_tf = transforms.Compose([
+def get_training_transforms(yunet, feature):
+    return transforms.Compose([
+        FacialRegionWrapper(yunet, feature),
         transforms.Resize((IMAGE_SIZE, IMAGE_SIZE)),
         transforms.RandomHorizontalFlip(),
         transforms.RandomRotation(10),
@@ -33,12 +44,33 @@ def get_transforms():
         transforms.Normalize(mean=[0.485, 0.456, 0.406],
                              std=[0.229, 0.224, 0.225]),
     ])
-    return train_tf
 
-def run(csv_path='csv_builder_output/data.csv', save_path='train_output/model.pth', effnet_index=0):
+def get_validation_transforms(yunet, feature):
+    return transforms.Compose([
+        FacialRegionWrapper(yunet, feature),
+        transforms.Resize((IMAGE_SIZE, IMAGE_SIZE)),
+        # FacialRegionExtractor(feature),
+        # transforms.RandomHorizontalFlip(),
+        # transforms.RandomRotation(10),
+        # transforms.ColorJitter(brightness=0.2, contrast=0.2),
+        transforms.ToTensor(),
+        transforms.Normalize(mean=[0.485, 0.456, 0.406],
+                             std=[0.229, 0.224, 0.225]),
+    ])
+
+def run(csv_path='csv_builder_output/data.csv', save_path='train_output/model.pth', effnet_index=0, feature=0):
     print("Device:", DEVICE)
 
-    train_tf = get_transforms()
+    yunet = cv.FaceDetectorYN.create(
+        'face_detection_yunet_2026may.onnx',  # model
+        "",                                   # config
+        (YUNET_SIZE, YUNET_SIZE),             # input_size
+        DETECT_THRESHOLD,                     # score_threshold
+        0.3,                                  # nms_threshold
+        5000                                  # top_k
+    )
+
+    train_tf = get_training_transforms(yunet, feature)
 
     train_ds = AgeDataset(csv_path, transform=train_tf)
 
@@ -95,15 +127,19 @@ def run(csv_path='csv_builder_output/data.csv', save_path='train_output/model.pt
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
-    parser.add_argument('-i', '--input_csv', type=str, default='csv_builder_output/data.csv', help='path to input csv (from csv_builder.py).')
-    parser.add_argument('-o', '--output_pth', type=str, default='train_output/model.pth', help='path to output pth.')
+    parser.add_argument('-t', '--train_csv', type=str, default='csv_builder_output/train.csv', help='path to training csv (from csv_builder.py).')
+    parser.add_argument('-v', '--validation_csv', type=str, default='csv_builder_output/validation.csv', help='path to validation csv (from csv_builder.py).')
     parser.add_argument('-e', '--effnet_index', type=int, default=0, help='index of EfficientNet model.')
+    parser.add_argument('-f', '--feature', type=int, default=0, help='feature to be extracted.')
+    parser.add_argument('-o', '--output_pth', type=str, default='train_output/model.pth', help='path to output pth.')
     args = parser.parse_args()
 
-    print(f'Running train.py with arguments:')
-    print(f'\tInput CSV = {args.input_csv}')
-    print(f'\tOutput PTH = {args.output_pth}')
+    print(f'Running train_model.py with arguments:')
+    print(f'\tTraining CSV = {args.train_csv}')
+    print(f'\tValidation CSV = {args.validation_csv}')
     print(f'\tModel = EfficientNetB{args.effnet_index}')
+    print(f'\tFeature = {args.feature}')
+    print(f'\tOutput PTH = {args.output_pth}')
     print()
 
-    run(args.input_csv, args.output_pth, args.effnet_index)
+    run(args.train_csv, args.output_pth, args.effnet_index, args.feature)

@@ -4,6 +4,7 @@ import os
 from collections import defaultdict
 import csv
 import numpy as np
+import cv2 as cv
 import torch
 from PIL import Image
 from torch.utils.data import DataLoader
@@ -13,21 +14,30 @@ from tqdm import tqdm
 from dataset import AgeDataset
 from model import build_model
 
+import sys
+sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '../face_region_extractor/')))
+from runtime_facial_region_extractor import FacialRegionWrapper
+
 DEVICE = 'cuda' if torch.cuda.is_available() else 'cpu'
 
 MIN_AGE = 5
 MAX_AGE = 70
 AGE_RANGE = MAX_AGE - MIN_AGE
+NUM_WORKERS = 0
 
 IMAGE_SIZE = 128
 BATCH_SIZE = 32
+YUNET_SIZE = 320
+DETECT_THRESHOLD = 0.85
 
-trans = transforms.Compose([
-    transforms.Resize((IMAGE_SIZE, IMAGE_SIZE)),
-    transforms.ToTensor(),
-    transforms.Normalize(mean=[0.485, 0.456, 0.406],
-                         std=[0.229, 0.224, 0.225]),
-])
+def get_test_transforms(yunet, feature):
+    return transforms.Compose([
+        FacialRegionWrapper(yunet, feature),
+        transforms.Resize((IMAGE_SIZE, IMAGE_SIZE)),
+        transforms.ToTensor(),
+        transforms.Normalize(mean=[0.485, 0.456, 0.406],
+                            std=[0.229, 0.224, 0.225]),
+    ])
 
 
 def load_model(model_p, effnet_index):
@@ -38,16 +48,26 @@ def load_model(model_p, effnet_index):
     return model
 
 
-def eval(csv_path, modelp, effnet_index, age_thresholds=(18,), output_dir="./eval_outputs"):
+def eval(csv_path, modelp, effnet_index, feature, age_thresholds=(18,), output_dir="./eval_outputs"):
     os.makedirs(output_dir, exist_ok=True)
 
-    evaluation_dataset = AgeDataset(csv_path, transform=trans)
+    yunet = cv.FaceDetectorYN.create(
+        'face_detection_yunet_2026may.onnx',  # model
+        "",                                   # config
+        (YUNET_SIZE, YUNET_SIZE),             # input_size
+        DETECT_THRESHOLD,                     # score_threshold
+        0.3,                                  # nms_threshold
+        5000                                  # top_k
+    )
+
+    test_tf = get_test_transforms(yunet, feature)
+    evaluation_dataset = AgeDataset(csv_path, transform=test_tf)
 
     loader = DataLoader(
         evaluation_dataset,
         batch_size=BATCH_SIZE,
         shuffle=False,
-        num_workers=4,
+        num_workers=NUM_WORKERS,
         pin_memory=True
     )
 
@@ -179,10 +199,11 @@ def eval(csv_path, modelp, effnet_index, age_thresholds=(18,), output_dir="./eva
     print(f"Saved: {per_age_cls_path}")
 
 
-def singlepred(filepath, modelpath):
+def singlepred(filepath, modelpath, yunet, feature):
     model = load_model(modelpath)
     pred_img = Image.open(filepath).convert('RGB')
-    pred_img = trans(pred_img).unsqueeze(0).to(DEVICE)
+    test_tf = get_test_transforms(yunet, feature)
+    pred_img = test_tf(pred_img).unsqueeze(0).to(DEVICE)
 
     with torch.no_grad():
         pred = model(pred_img)
@@ -196,15 +217,17 @@ if __name__ == '__main__':
     parser.add_argument('-c', '--input_csv', type=str, default='csv_builder_output/data.csv', help='path to input csv (from csv_builder.py).')
     parser.add_argument('-p', '--input_pth', type=str, default='train_output/model.pth', help='path to input pth (from train.py).')
     parser.add_argument('-e', '--effnet_index', type=int, default=0, help='index of EfficientNet model.')
+    parser.add_argument('-f', '--feature', type=int, default=0, help='feature to be extracted.')
     parser.add_argument('-o', '--output_dir', type=str, default='test_output/', help='directory for output.')
     args = parser.parse_args()
 
-    print(f'Running test.py with arguments:')
+    print(f'Running test_model.py with arguments:')
     print(f'\tInput CSV = {args.input_csv}')
     print(f'\tInput PTH = {args.input_pth}')
     print(f'\tModel = EfficientNetB{args.effnet_index}')
+    print(f'\tFeature = {args.feature}')
     print(f'\tOutput Dir = {args.output_dir}')
     print()
 
-    eval(args.input_csv, args.input_pth, args.effnet_index,
+    eval(args.input_csv, args.input_pth, args.effnet_index, args.feature,
         age_thresholds=(13, 15, 18, 21), output_dir=args.output_dir)
