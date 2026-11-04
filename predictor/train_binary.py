@@ -10,6 +10,7 @@ import torch.utils.data
 from torch.utils.data import DataLoader
 import torchvision.datasets as dset
 import torchvision.transforms as transforms
+import dill
 
 from dataset import AgeDataset
 from model import build_model
@@ -22,7 +23,7 @@ LR = 3e-4
 MIN_AGE = 5
 MAX_AGE = 70
 AGE_RANGE = MAX_AGE - MIN_AGE
-NUM_WORKERS = 0
+NUM_WORKERS = 4
 NUM_CHANNELS = 3
 DEVICE = "cuda" if torch.cuda.is_available() else "cpu"
 PIN_MEMORY = True
@@ -91,6 +92,7 @@ def train_binary(train_csv, validation_csv, effnet_index, feature, seed, output_
                     "num_channels": NUM_CHANNELS,
                 },
                 ckpt_path,
+                pickle_module=dill
             )
             print(f"saved new best to {ckpt_path} (loss={best_loss:.6f})")
 

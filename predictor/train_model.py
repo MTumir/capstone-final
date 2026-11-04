@@ -6,6 +6,7 @@ import pandas as pd
 from PIL import Image
 import torch
 import torch.nn as nn
+import dill
 from torch.utils.data import DataLoader
 from torchvision import transforms
 from sklearn.model_selection import train_test_split
@@ -19,14 +20,14 @@ import sys
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '../face_region_extractor/')))
 from runtime_facial_region_extractor import FacialRegionWrapper
 
-IMAGE_SIZE = 32
+IMAGE_SIZE = 128
 BATCH_SIZE = 64
 EPOCHS = 10
 LR = 3e-4
 MIN_AGE = 5
 MAX_AGE = 70
 AGE_RANGE = MAX_AGE - MIN_AGE
-NUM_WORKERS = 0
+NUM_WORKERS = 4
 DEVICE = "cuda" if torch.cuda.is_available() else "cpu"
 PIN_MEMORY = True
 
@@ -72,19 +73,19 @@ def run(train_csv='csv_builder_output/train.csv', validation_csv='csv_builder_ou
     )
 
     train_tf = get_training_transforms(yunet, feature)
-    validation_tf = get_validation_transforms(yunet, feature)
+    # validation_tf = get_validation_transforms(yunet, feature)
 
     train_ds = AgeDataset(train_csv, transform=train_tf)
-    validation_ds = AgeDataset(validation_csv, transform=validation_tf)
+    # validation_ds = AgeDataset(validation_csv, transform=validation_tf)
 
     train_loader = DataLoader(
         train_ds, batch_size=BATCH_SIZE, shuffle=True,
         num_workers=NUM_WORKERS, pin_memory=PIN_MEMORY
     )
-    validation_loader = DataLoader(
-        validation_ds, batch_size=BATCH_SIZE, shuffle=False,
-        num_workers=NUM_WORKERS, pin_memory=PIN_MEMORY
-    )
+    # validation_loader = DataLoader(
+    #     validation_ds, batch_size=BATCH_SIZE, shuffle=False,
+    #     num_workers=NUM_WORKERS, pin_memory=PIN_MEMORY
+    # )
 
     model = build_model(effnet_index).to(DEVICE)
 
@@ -124,37 +125,41 @@ def run(train_csv='csv_builder_output/train.csv', validation_csv='csv_builder_ou
         scheduler.step()
         print("LR:", scheduler.get_last_lr()[0])
 
-        print('Evaluating...')
-        model.eval()
-        running_loss = 0.0
+        # print('Evaluating...')
+        # model.eval()
+        # running_loss = 0.0
 
-        for images, ages in tqdm(validation_loader, desc="validation"):
-            images = images.to(DEVICE, non_blocking=True)
-            ages = ages.to(DEVICE, non_blocking=True).unsqueeze(1)
+        # for images, ages in tqdm(validation_loader, desc="validation"):
+        #     images = images.to(DEVICE, non_blocking=True)
+        #     ages = ages.to(DEVICE, non_blocking=True).unsqueeze(1)
 
-            optimizer.zero_grad(set_to_none=True)
-            with torch.amp.autocast("cuda", enabled=use_amp):
-                preds = model(images)
-                loss = criterion(preds, ages)
+        #     optimizer.zero_grad(set_to_none=True)
+        #     with torch.amp.autocast("cuda", enabled=use_amp):
+        #         preds = model(images)
+        #         loss = criterion(preds, ages)
 
-            scaler.scale(loss).backward()
-            scaler.step(optimizer)
-            scaler.update()
+        #     scaler.scale(loss).backward()
+        #     scaler.step(optimizer)
+        #     scaler.update()
 
-            running_loss += loss.item()
+        #     running_loss += loss.item()
 
-        validation_loss = running_loss / max(1, len(validation_loader))
-        print(f"Validation loss (normalized MAE): {validation_loss:.4f}")
+        # validation_loss = running_loss / max(1, len(validation_loader))
+        # print(f"Validation loss (normalized MAE): {validation_loss:.4f}")
 
-        scheduler.step()
-        print("LR:", scheduler.get_last_lr()[0])
+        # scheduler.step()
+        # print("LR:", scheduler.get_last_lr()[0])
 
-    torch.save({
-    "model_state_dict": model.state_dict(),
-    "image_size": IMAGE_SIZE,
-    "max_age": MAX_AGE,
-    "min_age": MIN_AGE,},
-    save_path)
+    torch.save(
+        {
+            "model_state_dict": model.state_dict(),
+            "image_size": IMAGE_SIZE,
+            "max_age": MAX_AGE,
+            "min_age": MIN_AGE,
+        },
+        save_path,
+        pickle_module=dill
+    )
     print(f"Saved best checkpoint -> {save_path}")
 
 

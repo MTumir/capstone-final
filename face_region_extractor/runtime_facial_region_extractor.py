@@ -161,7 +161,8 @@ class FacialRegionWrapper:
         
         extracted_feature = process_image(self.yunet, self.feature, bgr,
                                input_size=self.INPUT_SIZE, output_size=self.OUTPUT_SIZE)
-        
+
+        # Should never come up, screen for this when prepping data.
         if extracted_feature is None or extracted_feature.size == 0:
             print('FacialRegionWrapper could not find feature!')
             return image
@@ -235,9 +236,7 @@ class FacialRegionExtractor:
             np.ndarray: NumPy array representing the cropped image.
             None: Nothing, if the image could not be read.
         """
-
-        print(f'Opening image at {input}')
-
+        
         # Grab image and resize.
         img = cv.imread(input)
         if type(img) is not np.ndarray:

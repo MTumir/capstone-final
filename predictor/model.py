@@ -1,7 +1,6 @@
 import torch.nn as nn
 import torchvision.models as models
 
-
 def build_model(model_index=0):
     match model_index:
         case 0: model = models.efficientnet_b0(weights=models.EfficientNet_B0_Weights.DEFAULT)

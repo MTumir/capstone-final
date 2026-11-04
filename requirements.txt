@@ -1,6 +1,7 @@
 pandas
 scikit-learn
 torchvision
+dill
 tqdm
 
 opencv-python

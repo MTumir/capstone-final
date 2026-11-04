@@ -7,7 +7,7 @@ import pandas as pd
 
 import sys
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '../face_region_extractor/')))
-from runtime_facial_region_extractor import FacialRegionExtractor
+from runtime_facial_region_extractor import FacialRegionExtractor, process_image, adjust_coordinates
 
 minAge = 5
 maxAge = 70

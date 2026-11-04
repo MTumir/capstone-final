@@ -10,6 +10,7 @@ from PIL import Image
 from torch.utils.data import DataLoader
 from torchvision import transforms
 from tqdm import tqdm
+import dill
 
 from dataset import AgeDataset
 from model import build_model
@@ -23,7 +24,7 @@ DEVICE = 'cuda' if torch.cuda.is_available() else 'cpu'
 MIN_AGE = 5
 MAX_AGE = 70
 AGE_RANGE = MAX_AGE - MIN_AGE
-NUM_WORKERS = 0
+NUM_WORKERS = 4
 
 IMAGE_SIZE = 32
 BATCH_SIZE = 32
@@ -42,7 +43,7 @@ def get_test_transforms(yunet, feature):
 
 
 def load_model(model_p, effnet_index):
-    save_model = torch.load(model_p, map_location=DEVICE)
+    save_model = torch.load(model_p, map_location=DEVICE, pickle_module=dill)
     model = build_model(effnet_index).to(DEVICE)
     model.load_state_dict(save_model["model_state_dict"])
     model.eval()

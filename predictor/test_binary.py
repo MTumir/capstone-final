@@ -23,14 +23,6 @@ BATCH_SIZE = 32
 YUNET_INPUT_SIZE = 320
 YUNET_SCORE_THRESHOLD = 0.85
 
-# def load_model(model_p):
-#     save_model = torch.load(model_p, map_location=DEVICE)
-#     model = build_model().to(DEVICE)
-#     model.load_state_dict(save_model["model_state_dict"])
-#     model.eval()
-#     return model
-
-
 def eval(input_csv, input_pth, effnet_index, feature, threshold=18, output_dir="./eval_outputs"):
     os.makedirs(output_dir, exist_ok=True)
 
