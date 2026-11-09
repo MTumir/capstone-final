@@ -10,6 +10,7 @@ from PIL import Image
 from torch.utils.data import DataLoader
 from torchvision import transforms
 from tqdm import tqdm
+import dill
 
 from dataset import AgeDataset
 from model import build_model
@@ -23,12 +24,13 @@ DEVICE = 'cuda' if torch.cuda.is_available() else 'cpu'
 MIN_AGE = 5
 MAX_AGE = 70
 AGE_RANGE = MAX_AGE - MIN_AGE
-NUM_WORKERS = 0
+NUM_WORKERS = 4
 
 IMAGE_SIZE = 128
 BATCH_SIZE = 32
-YUNET_SIZE = 320
-DETECT_THRESHOLD = 0.85
+
+YUNET_INPUT_SIZE = 320
+YUNET_SCORE_THRESHOLD = 0.85
 
 def get_test_transforms(yunet, feature):
     return transforms.Compose([
@@ -41,7 +43,7 @@ def get_test_transforms(yunet, feature):
 
 
 def load_model(model_p, effnet_index):
-    save_model = torch.load(model_p, map_location=DEVICE)
+    save_model = torch.load(model_p, map_location=DEVICE, pickle_module=dill)
     model = build_model(effnet_index).to(DEVICE)
     model.load_state_dict(save_model["model_state_dict"])
     model.eval()
@@ -54,8 +56,8 @@ def eval(csv_path, modelp, effnet_index, feature, age_thresholds=(18,), output_d
     yunet = cv.FaceDetectorYN.create(
         'face_detection_yunet_2026may.onnx',  # model
         "",                                   # config
-        (YUNET_SIZE, YUNET_SIZE),             # input_size
-        DETECT_THRESHOLD,                     # score_threshold
+        (YUNET_INPUT_SIZE, YUNET_INPUT_SIZE), # input_size
+        YUNET_SCORE_THRESHOLD,                # score_threshold
         0.3,                                  # nms_threshold
         5000                                  # top_k
     )
