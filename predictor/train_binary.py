@@ -1,3 +1,8 @@
+import os
+os.environ.setdefault("CUBLAS_WORKSPACE_CONFIG", ":4096:8")
+import faulthandler
+faulthandler.enable()
+
 import argparse
 import random
 from multiprocessing.spawn import freeze_support
@@ -34,6 +39,8 @@ YUNET_INPUT_SIZE = 320
 YUNET_SCORE_THRESHOLD = 0.85
 
 def train_binary(train_csv, validation_csv, effnet_index, feature, seed, output_pth):
+    print(f'Device: {DEVICE}')
+
     random.seed(seed)
     torch.manual_seed(seed)
     torch.use_deterministic_algorithms(True)
@@ -82,7 +89,7 @@ def train_binary(train_csv, validation_csv, effnet_index, feature, seed, output_
         num_images = 0
         for images, ages in tqdm(train_loader, desc='train'):
             images = images.to(DEVICE, non_blocking=True)
-            ages = ages.to(DEVICE, non_blocking=True).unsqueeze(1)
+            ages = ages.to(DEVICE, dtype=torch.float32)
 
             classifier.zero_grad()
             output = classifier(images).view(-1)
@@ -101,15 +108,13 @@ def train_binary(train_csv, validation_csv, effnet_index, feature, seed, output_
         num_images = 0
         for images, ages in tqdm(validation_loader, desc='validation'):
             images = images.to(DEVICE, non_blocking=True)
-            ages = ages.to(DEVICE, non_blocking=True).unsqueeze(1)
+            ages = ages.to(DEVICE, dtype=torch.float32)
 
-            classifier.zero_grad()
             output = classifier(images).view(-1)
             err = criterion(output, ages)
-            running_loss += err * images.size(0)
+            batch_loss = err.item()
+            running_loss += batch_loss * images.size(0)
             num_images += images.size(0)
-            err.backward()
-            optimizer.step()
         validation_loss = running_loss / num_images
 
         # Save only when improved
@@ -131,9 +136,26 @@ def train_binary(train_csv, validation_csv, effnet_index, feature, seed, output_
             print(f"saved new best to {ckpt_path} (loss={best_loss:.6f})")
         else:
             epochs_without_improvement += 1
+            print(f'Epoch {epoch} saw no improvement.')
             if epochs_without_improvement >= MAXIMUM_BAD_EPOCHS:
                 print(f'{epochs_without_improvement} epochs passed with no improvement. Exiting.')
                 break
+
+        # if train_loss < best_loss:
+        #     best_loss = train_loss
+        #     torch.save(
+        #         {
+        #             "epoch": epoch,
+        #             "best_loss": best_loss,
+        #             "model_state_dict": classifier.state_dict(),
+        #             "optimizer_state_dict": optimizer.state_dict(),
+        #             "image_size": IMAGE_SIZE,
+        #             "num_channels": NUM_CHANNELS,
+        #         },
+        #         ckpt_path,
+        #         pickle_module=dill
+        #     )
+        #     print(f"saved new best to {ckpt_path} (loss={best_loss:.6f})")
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()

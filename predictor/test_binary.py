@@ -36,10 +36,10 @@ def eval(input_csv, input_pth, effnet_index, feature, threshold=18, output_dir="
     )
 
     test_tf = get_test_transforms(yunet, feature)
-    evaluation_dataset = AgeDataset(input_csv, transform=test_tf)
+    test_ds = AgeDataset(input_csv, transform=test_tf)
 
-    loader = DataLoader(
-        evaluation_dataset,
+    test_loader = DataLoader(
+        test_ds,
         batch_size=BATCH_SIZE,
         shuffle=False,
         num_workers=4,
@@ -52,9 +52,10 @@ def eval(input_csv, input_pth, effnet_index, feature, threshold=18, output_dir="
     predicted = []
 
     with torch.no_grad():
-        for images, ages in tqdm(loader, desc="evaluating"):
+        for images, ages in tqdm(test_loader, desc="test"):
             images = images.to(DEVICE, non_blocking=True)
             ages = ages.to(DEVICE, non_blocking=True).unsqueeze(1)
+
             preds = model(images).cpu().numpy().flatten().tolist()
             act = (ages * AGE_RANGE + MIN_AGE).cpu().numpy().flatten()
             actual.extend(act.tolist())
