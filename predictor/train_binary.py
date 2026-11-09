@@ -10,15 +10,17 @@ import torch.utils.data
 from torch.utils.data import DataLoader
 import torchvision.datasets as dset
 import torchvision.transforms as transforms
+from tqdm import tqdm
 import dill
 
 from dataset import AgeDataset
 from model import build_model
-from train_model import get_training_transforms
+from train_model import get_training_transforms, get_validation_transforms
 
 IMAGE_SIZE = 128
 BATCH_SIZE = 64
 EPOCHS = 10
+MAXIMUM_BAD_EPOCHS = 3
 LR = 3e-4
 MIN_AGE = 5
 MAX_AGE = 70
@@ -46,11 +48,17 @@ def train_binary(train_csv, validation_csv, effnet_index, feature, seed, output_
     )
 
     train_tf = get_training_transforms(yunet, feature)
+    validation_tf = get_validation_transforms(yunet, feature)
 
     train_ds = AgeDataset(train_csv, transform=train_tf)
+    validation_ds = AgeDataset(validation_csv, transform=validation_tf)
 
     train_loader = DataLoader(
         train_ds, batch_size=BATCH_SIZE, shuffle=True,
+        num_workers=NUM_WORKERS, pin_memory=PIN_MEMORY
+    )
+    validation_loader = DataLoader(
+        validation_ds, batch_size=BATCH_SIZE, shuffle=False,
         num_workers=NUM_WORKERS, pin_memory=PIN_MEMORY
     )
 
@@ -63,25 +71,51 @@ def train_binary(train_csv, validation_csv, effnet_index, feature, seed, output_
     ckpt_path.parent.mkdir(parents=True, exist_ok=True)
 
     best_loss = float("inf")
+    epochs_without_improvement = 0
     for epoch in range(EPOCHS):
+        print(f"\nEpoch {epoch}/{EPOCHS}")
+
+        # Training step
+        print('Training...')
+        classifier.train()
         running_loss = 0.0
-        num_inputs = 0
-        for i, data in enumerate(train_loader):
+        num_images = 0
+        for images, ages in tqdm(train_loader, desc='train'):
+            images = images.to(DEVICE, non_blocking=True)
+            ages = ages.to(DEVICE, non_blocking=True).unsqueeze(1)
+
             classifier.zero_grad()
-            inputs = data[0].to(DEVICE)
-            labels = data[1].type(torch.FloatTensor).to(DEVICE)
-            output = classifier(inputs).view(-1)
-            err = criterion(output, labels)
-            running_loss += err * inputs.size(0)
-            num_inputs += inputs.size(0)
+            output = classifier(images).view(-1)
+            err = criterion(output, ages)
+            running_loss += err * images.size(0)
+            num_images += images.size(0)
             err.backward()
             optimizer.step()
-        running_loss = running_loss / num_inputs
-        print(epoch + 1, running_loss)
+        train_loss = running_loss / num_images
+        print(epoch + 1, train_loss)
+
+        # Validation step
+        print('Evaluating...')
+        classifier.eval()
+        running_loss = 0.0
+        num_images = 0
+        for images, ages in tqdm(validation_loader, desc='validation'):
+            images = images.to(DEVICE, non_blocking=True)
+            ages = ages.to(DEVICE, non_blocking=True).unsqueeze(1)
+
+            classifier.zero_grad()
+            output = classifier(images).view(-1)
+            err = criterion(output, ages)
+            running_loss += err * images.size(0)
+            num_images += images.size(0)
+            err.backward()
+            optimizer.step()
+        validation_loss = running_loss / num_images
 
         # Save only when improved
-        if running_loss < best_loss:
-            best_loss = running_loss
+        if validation_loss < best_loss:
+            best_loss = validation_loss
+            epochs_without_improvement = 0
             torch.save(
                 {
                     "epoch": epoch,
@@ -95,6 +129,11 @@ def train_binary(train_csv, validation_csv, effnet_index, feature, seed, output_
                 pickle_module=dill
             )
             print(f"saved new best to {ckpt_path} (loss={best_loss:.6f})")
+        else:
+            epochs_without_improvement += 1
+            if epochs_without_improvement >= MAXIMUM_BAD_EPOCHS:
+                print(f'{epochs_without_improvement} epochs passed with no improvement. Exiting.')
+                break
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()

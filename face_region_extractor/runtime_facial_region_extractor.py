@@ -79,6 +79,10 @@ def process_image(yunet, feature, input, input_size = 320, output_size = 32) -> 
     y_lcm = int(face[1][0][13])     # left mouth corner, y
 
     # Snip image to only requested feature, then return the image.
+    if feature == -1:       # Full Face
+        print(f'\t*WARNING - NO SNIPPING* Returning full face image')
+        return img
+    
     if feature == 0:        # Right Eye
         y_start, y_end = y_re - output_size, y_re + output_size
         x_start, x_end = x_re - output_size, x_re + output_size
