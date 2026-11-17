@@ -19,6 +19,7 @@ from tqdm import tqdm
 import dill
 
 from dataset import AgeDataset
+from predictor.binary_dataset import BinaryAgeDataset
 from model import build_model
 from train_model import get_training_transforms, get_validation_transforms
 
@@ -38,7 +39,7 @@ PIN_MEMORY = True
 YUNET_INPUT_SIZE = 320
 YUNET_SCORE_THRESHOLD = 0.85
 
-def train_binary(train_csv, validation_csv, effnet_index, feature, seed, output_pth):
+def train_binary(train_csv, validation_csv, effnet_index, feature, feature_list, seed, output_pth):
     print(f'Device: {DEVICE}')
 
     random.seed(seed)
@@ -54,11 +55,13 @@ def train_binary(train_csv, validation_csv, effnet_index, feature, seed, output_
         5000                                  # top_k
     )
 
-    train_tf = get_training_transforms(yunet, feature)
-    validation_tf = get_validation_transforms(yunet, feature)
+    train_tf = get_training_transforms(yunet, feature, feature_list)
+    validation_tf = get_validation_transforms(yunet, feature, feature_list)
 
-    train_ds = AgeDataset(train_csv, transform=train_tf)
-    validation_ds = AgeDataset(validation_csv, transform=validation_tf)
+    # train_ds = AgeDataset(train_csv, transform=train_tf, binary=True)
+    # validation_ds = AgeDataset(validation_csv, transform=validation_tf, binary=True)
+    train_ds = BinaryAgeDataset(train_csv, transform=train_tf)
+    validation_ds = BinaryAgeDataset(validation_csv, transform=validation_tf)
 
     train_loader = DataLoader(
         train_ds, batch_size=BATCH_SIZE, shuffle=True,
@@ -87,14 +90,15 @@ def train_binary(train_csv, validation_csv, effnet_index, feature, seed, output_
         classifier.train()
         running_loss = 0.0
         num_images = 0
-        for images, ages in tqdm(train_loader, desc='train'):
+        for images, labels in tqdm(train_loader, desc='train'):
             images = images.to(DEVICE, non_blocking=True)
-            ages = ages.to(DEVICE, dtype=torch.float32)
+            labels = labels.to(DEVICE, dtype=torch.float32, non_blocking=True)
 
             classifier.zero_grad()
             output = classifier(images).view(-1)
-            err = criterion(output, ages)
-            running_loss += err * images.size(0)
+            err = criterion(output, labels)
+            batch_loss = err.item()
+            running_loss += batch_loss * images.size(0)
             num_images += images.size(0)
             err.backward()
             optimizer.step()
@@ -106,12 +110,12 @@ def train_binary(train_csv, validation_csv, effnet_index, feature, seed, output_
         classifier.eval()
         running_loss = 0.0
         num_images = 0
-        for images, ages in tqdm(validation_loader, desc='validation'):
+        for images, labels in tqdm(validation_loader, desc='validation'):
             images = images.to(DEVICE, non_blocking=True)
-            ages = ages.to(DEVICE, dtype=torch.float32)
+            labels = labels.to(DEVICE, dtype=torch.float32, non_blocking=True)
 
             output = classifier(images).view(-1)
-            err = criterion(output, ages)
+            err = criterion(output, labels)
             batch_loss = err.item()
             running_loss += batch_loss * images.size(0)
             num_images += images.size(0)
@@ -141,21 +145,6 @@ def train_binary(train_csv, validation_csv, effnet_index, feature, seed, output_
                 print(f'{epochs_without_improvement} epochs passed with no improvement. Exiting.')
                 break
 
-        # if train_loss < best_loss:
-        #     best_loss = train_loss
-        #     torch.save(
-        #         {
-        #             "epoch": epoch,
-        #             "best_loss": best_loss,
-        #             "model_state_dict": classifier.state_dict(),
-        #             "optimizer_state_dict": optimizer.state_dict(),
-        #             "image_size": IMAGE_SIZE,
-        #             "num_channels": NUM_CHANNELS,
-        #         },
-        #         ckpt_path,
-        #         pickle_module=dill
-        #     )
-        #     print(f"saved new best to {ckpt_path} (loss={best_loss:.6f})")
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
@@ -163,6 +152,7 @@ if __name__ == "__main__":
     parser.add_argument('-v', '--validation_csv', type=str, default='csv_builder_output/validation.csv', help='path to validation csv (from csv_builder.py).')
     parser.add_argument('-e', '--effnet_index', type=int, default=0, help='index of EfficientNet model.')
     parser.add_argument('-f', '--feature', type=int, default=0, help='feature to be extracted.')
+    parser.add_argument('-fl', '--feature_list', nargs='+', type=int, help='features to be extracted, optional.')
     parser.add_argument('-s', '--seed', type=int, default=67, help='seed for PyTorch.')
     parser.add_argument('-o', '--output_pth', type=str, default='train_output/model.pth', help='path to output pth.')
     args = parser.parse_args()
@@ -172,10 +162,11 @@ if __name__ == "__main__":
     print(f'\tValidation CSV = {args.validation_csv}')
     print(f'\tModel = EfficientNetB{args.effnet_index}')
     print(f'\tFeature = {args.feature}')
+    print(f'\tFeature List = {args.feature_list}')
     print(f'\tSeed = {args.seed}')
     print(f'\tOutput PTH = {args.output_pth}')
     print()
 
     freeze_support()
     train_binary(args.train_csv, args.validation_csv, args.effnet_index,
-                 args.feature, args.seed, args.output_pth)
+                 args.feature, args.feature_list, args.seed, args.output_pth)

@@ -319,14 +319,24 @@ if __name__ == "__main__":
     rgb_image = cv.cvtColor(img_original, cv.COLOR_BGR2RGB)
     pil_image = Image.fromarray(rgb_image)
 
-    for i in range(0, feature_count):
-        img = process_image(yunet=yunet, feature=i, input=img_original)
+    # for i in range(0, feature_count):
+        # img = process_image(yunet=yunet, feature=i, input=img_original)
         # frw = FacialRegionWrapper(yunet, i)
-        # frw(pil_image)
-        cv.imshow(f'img_feature_{i}', img)
+        # img = frw(pil_image)
+        # img.show()
         # cv.imwrite(f'test/img_feature_{i}.jpg', img)
-        cv.waitKey(0)
 
-    img = process_image(yunet=yunet, feature_list=[0,1,2,3,4,5], input=img_original)
-    cv.imshow(f'img_featurelist', img)
-    cv.waitKey(0)
+    frw = FacialRegionWrapper(yunet, -1)
+    img = frw(pil_image)
+    # img = process_image(yunet=yunet, feature_list=[0,1,2,3,4,5], input=img_original)
+    # cv.imshow(f'img_featurelist', img)
+    # cv.waitKey(0)
+    img.save('full.png')
+
+    frw = FacialRegionWrapper(yunet, 2, [0,1,3])
+    img = frw(pil_image)
+    # img = process_image(yunet=yunet, feature_list=[0,1,2,3,4,5], input=img_original)
+    # cv.imshow(f'img_featurelist', img)
+    # cv.waitKey(0)
+    img.save('flist.png')
+    # img.show()

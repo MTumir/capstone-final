@@ -34,9 +34,9 @@ PIN_MEMORY = True
 YUNET_INPUT_SIZE = 320
 YUNET_SCORE_THRESHOLD = 0.85
 
-def get_training_transforms(yunet, feature):
+def get_training_transforms(yunet, feature, feature_list = None):
     return transforms.Compose([
-        FacialRegionWrapper(yunet, feature),
+        FacialRegionWrapper(yunet, feature, feature_list),
         transforms.Resize((IMAGE_SIZE, IMAGE_SIZE)),
         transforms.RandomHorizontalFlip(),
         transforms.RandomRotation(10),
@@ -46,9 +46,9 @@ def get_training_transforms(yunet, feature):
                              std=[0.229, 0.224, 0.225]),
     ])
 
-def get_validation_transforms(yunet, feature):
+def get_validation_transforms(yunet, feature, feature_list = None):
     return transforms.Compose([
-        FacialRegionWrapper(yunet, feature),
+        FacialRegionWrapper(yunet, feature, feature_list),
         transforms.Resize((IMAGE_SIZE, IMAGE_SIZE)),
         # FacialRegionExtractor(feature),
         # transforms.RandomHorizontalFlip(),
