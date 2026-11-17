@@ -32,9 +32,9 @@ BATCH_SIZE = 32
 YUNET_INPUT_SIZE = 320
 YUNET_SCORE_THRESHOLD = 0.85
 
-def get_test_transforms(yunet, feature):
+def get_test_transforms(yunet, feature, feature_list = None):
     return transforms.Compose([
-        FacialRegionWrapper(yunet, feature),
+        FacialRegionWrapper(yunet, feature, feature_list),
         transforms.Resize((IMAGE_SIZE, IMAGE_SIZE)),
         transforms.ToTensor(),
         transforms.Normalize(mean=[0.485, 0.456, 0.406],

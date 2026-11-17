@@ -10,6 +10,7 @@ from torchvision import transforms
 from tqdm import tqdm
 
 from dataset import AgeDataset
+from predictor.binary_dataset import BinaryAgeDataset
 from model import build_model
 from test_model import get_test_transforms, load_model
 
@@ -23,8 +24,9 @@ BATCH_SIZE = 32
 YUNET_INPUT_SIZE = 320
 YUNET_SCORE_THRESHOLD = 0.85
 
-def eval(input_csv, input_pth, effnet_index, feature, threshold=18, output_dir="./eval_outputs"):
+def eval(input_csv, input_pth, effnet_index, feature, feature_list, threshold=18, output_dir="./eval_outputs"):
     os.makedirs(output_dir, exist_ok=True)
+    print(f'Device: {DEVICE}')
 
     yunet = cv.FaceDetectorYN.create(
         'face_detection_yunet_2026may.onnx',  # model
@@ -35,11 +37,11 @@ def eval(input_csv, input_pth, effnet_index, feature, threshold=18, output_dir="
         5000                                  # top_k
     )
 
-    test_tf = get_test_transforms(yunet, feature)
-    evaluation_dataset = AgeDataset(input_csv, transform=test_tf)
+    test_tf = get_test_transforms(yunet, feature, feature_list)
+    test_ds = AgeDataset(input_csv, transform=test_tf)
 
-    loader = DataLoader(
-        evaluation_dataset,
+    test_loader = DataLoader(
+        test_ds,
         batch_size=BATCH_SIZE,
         shuffle=False,
         num_workers=4,
@@ -52,11 +54,12 @@ def eval(input_csv, input_pth, effnet_index, feature, threshold=18, output_dir="
     predicted = []
 
     with torch.no_grad():
-        for images, ages in tqdm(loader, desc="evaluating"):
+        for images, labels in tqdm(test_loader, desc="test"):
             images = images.to(DEVICE, non_blocking=True)
-            ages = ages.to(DEVICE, non_blocking=True).unsqueeze(1)
+            labels = labels.to(DEVICE, non_blocking=True).unsqueeze(1)
+
             preds = model(images).cpu().numpy().flatten().tolist()
-            act = (ages * AGE_RANGE + MIN_AGE).cpu().numpy().flatten()
+            act = (labels * AGE_RANGE + MIN_AGE).cpu().numpy().flatten()
             actual.extend(act.tolist())
             predicted.extend(preds)
     actual = np.array(actual)
@@ -128,6 +131,8 @@ if __name__ == '__main__':
     parser.add_argument('-p', '--input_pth', type=str, default='train_output/model.pth', help='path to input pth (from train.py).')
     parser.add_argument('-e', '--effnet_index', type=int, default=0, help='index of EfficientNet model.')
     parser.add_argument('-f', '--feature', type=int, default=0, help='feature to be extracted.')
+    parser.add_argument('-fl', '--feature_list', nargs='+', type=int, help='features to be extracted, optional.')
+    parser.add_argument('-t', '--threshold', type=int, default=18, help='age threshold for binary classification.')
     parser.add_argument('-o', '--output_dir', type=str, default='test_output/', help='directory for output.')
     args = parser.parse_args()
 
@@ -136,8 +141,10 @@ if __name__ == '__main__':
     print(f'\tInput PTH = {args.input_pth}')
     print(f'\tModel = EfficientNetB{args.effnet_index}')
     print(f'\tFeature = {args.feature}')
+    print(f'\tFeature List = {args.feature_list}')
+    print(f'\tAge Threshold = {args.threshold}')
     print(f'\tOutput Dir = {args.output_dir}')
     print()
 
-    eval(args.input_csv, args.input_pth, args.effnet_index, args.feature,
-        threshold=18, output_dir=args.output_dir)
+    eval(args.input_csv, args.input_pth, args.effnet_index, 
+        args.feature, args.feature_list, args.threshold, args.output_dir)

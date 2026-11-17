@@ -38,7 +38,7 @@ def adjust_coordinates(input_size, y_start, y_end, x_start, x_end) -> tuple[int,
         new_x_end -= shift
     return new_y_start, new_y_end, new_x_start, new_x_end
 
-def process_image(yunet, feature, input, input_size = 320, output_size = 32) -> np.ndarray | None:
+def process_image(yunet, feature = -2, feature_list = None, input = None, input_size = 320, output_size = 32) -> np.ndarray | None:
     """Returns the input image, cropped to feature.
 
     Args:
@@ -55,6 +55,10 @@ def process_image(yunet, feature, input, input_size = 320, output_size = 32) -> 
         np.ndarray: NumPy array representing the cropped image.
         None: Nothing, if the image could not be read.
     """
+
+    if input is None:
+        print('No input provided. Returning None.')
+        return None
 
     img = cv.resize(input, (input_size, input_size))
     width, height, _ = img.shape
@@ -78,59 +82,61 @@ def process_image(yunet, feature, input, input_size = 320, output_size = 32) -> 
     x_lcm = int(face[1][0][12])     # left mouth corner, x
     y_lcm = int(face[1][0][13])     # left mouth corner, y
 
-    # Snip image to only requested feature, then return the image.
-    if feature == 0:        # Right Eye
+    # Concatenating on axis 1 (horizontal)
+    ret_img = np.empty((output_size * 2,0,3))
+
+    # Snip image to only requested feature, then return the image.    
+    if feature == -1:       # Full Face
+        print(f'\t*WARNING - NO SNIPPING* Returning full face image')
+        return img
+
+    if feature == 0 or (feature_list is not None and 0 in feature_list):    # Right Eye
         y_start, y_end = y_re - output_size, y_re + output_size
         x_start, x_end = x_re - output_size, x_re + output_size
         y_start, y_end, x_start, x_end = adjust_coordinates(input_size, 
                                                             y_start, y_end, x_start, x_end)
-        right_eye_img = img[y_start:y_end, x_start:x_end]
-        print(f'\tReturning right eye image')
-        return right_eye_img
+        ret_img = np.concatenate((ret_img, img[y_start:y_end, x_start:x_end]), axis=1).astype(np.uint8)
+        print(f'\tExtracting right eye image')
 
-    if feature == 1:        # Left Eye
+    if feature == 1 or (feature_list is not None and 1 in feature_list):    # Left Eye
         y_start, y_end = y_le - output_size, y_le + output_size
         x_start, x_end = x_le - output_size, x_le + output_size
         y_start, y_end, x_start, x_end = adjust_coordinates(input_size, 
                                                             y_start, y_end, x_start, x_end)
-        left_eye_img = img[y_start:y_end, x_start:x_end]
-        print(f'\tReturning left eye image')
-        return left_eye_img
+        ret_img = np.concatenate((ret_img, img[y_start:y_end, x_start:x_end]), axis=1).astype(np.uint8)
+        print(f'\tExtracting left eye image')
 
-    if feature == 2:        # Nose
+    if feature == 2 or (feature_list is not None and 2 in feature_list):    # Nose
         y_start, y_end = y_nt - output_size, y_nt + output_size
         x_start, x_end = x_nt - output_size, x_nt + output_size
         y_start, y_end, x_start, x_end = adjust_coordinates(input_size, 
                                                             y_start, y_end, x_start, x_end)
-        nose_img = img[y_start:y_end, x_start:x_end]
-        print(f'\tReturning nose image')
-        return nose_img
+        ret_img = np.concatenate((ret_img, img[y_start:y_end, x_start:x_end]), axis=1).astype(np.uint8)
+        print(f'\tExtracting nose image')
         
-    if feature == 3:        # Mouth
+    if feature == 3 or (feature_list is not None and 3 in feature_list):    # Mouth
         y_center = int((y_rcm + y_lcm) / 2)
         x_center = int((x_rcm + x_lcm) / 2)
-        normalized_height, normalized_width = int(output_size * 0.75), int(output_size * 1.25)
+        normalized_height, normalized_width = output_size, int(output_size * 1.25)
         y_start, y_end = y_center - normalized_height, y_center + normalized_height
         x_start, x_end = x_center - normalized_width, x_center + normalized_width
         y_start, y_end, x_start, x_end = adjust_coordinates(input_size, 
                                                             y_start, y_end, x_start, x_end)
-        mouth_img = img[y_start:y_end, x_start:x_end]
-        print(f'\tReturning mouth image')
-        return mouth_img
+        ret_img = np.concatenate((ret_img, img[y_start:y_end, x_start:x_end]), axis=1).astype(np.uint8)
+        print(f'\tExtracting mouth image')
 
-    if feature == 4:        # Forehead
+    if feature == 4 or (feature_list is not None and 4 in feature_list):    # Forehead
         y_center = int((y1 - (h / 50) + y_re - (h / 20)) / 2)
         x_center = int((x_re - (w / 10) + x_le + (w / 10)) / 2)
-        normalized_height, normalized_width = int(output_size * 0.75), int(output_size * 1.25)
+        normalized_height, normalized_width = output_size, int(output_size * 1.25)
         y_start, y_end = y_center - normalized_height, y_center + normalized_height
         x_start, x_end = x_center - normalized_width, x_center + normalized_width
         y_start, y_end, x_start, x_end = adjust_coordinates(input_size, 
                                                             y_start, y_end, x_start, x_end)
-        forehead_img = img[y_start:y_end, x_start:x_end]
-        print(f'\tReturning forehead image')
-        return forehead_img
+        ret_img = np.concatenate((ret_img, img[y_start:y_end, x_start:x_end]), axis=1).astype(np.uint8)
+        print(f'\tExtracting forehead image')
 
-    if feature == 5:        # Cheek
+    if feature == 5 or (feature_list is not None and 5 in feature_list):    # Cheek
         y_center = int((y_rcm + y_lcm) / 2)
         x2 = x1 + w
         if x_rcm - x1 > x2 - x_lcm: # If right cheek is bigger
@@ -141,9 +147,10 @@ def process_image(yunet, feature, input, input_size = 320, output_size = 32) -> 
         x_start, x_end = x_center - output_size, x_center + output_size
         y_start, y_end, x_start, x_end = adjust_coordinates(input_size, 
                                                             y_start, y_end, x_start, x_end)
-        cheek_img = img[y_start:y_end, x_start:x_end]
-        print(f'\tReturning cheek image')
-        return cheek_img
+        ret_img = np.concatenate((ret_img, img[y_start:y_end, x_start:x_end]), axis=1).astype(np.uint8)
+        print(f'\tExtracting cheek image')
+
+    return ret_img
 
 class FacialRegionWrapper:
     """Wrapper for easy facial region extraction via __call__(). 
@@ -152,19 +159,24 @@ class FacialRegionWrapper:
     INPUT_SIZE = 320
     OUTPUT_SIZE = 32
 
-    def __init__(self, yunet, feature):
+    def __init__(self, yunet, feature = 0, feature_list = None):
         self.yunet = yunet
         self.feature = feature
+        self.feature_list = feature_list
 
     def __call__(self, image):
         bgr = cv.cvtColor(np.array(image.convert('RGB')), cv.COLOR_RGB2BGR)
-        
-        extracted_feature = process_image(self.yunet, self.feature, bgr,
-                               input_size=self.INPUT_SIZE, output_size=self.OUTPUT_SIZE)
+
+        if self.feature_list is None:
+            extracted_feature = process_image(yunet=self.yunet, feature=self.feature, input=bgr,
+                                input_size=self.INPUT_SIZE, output_size=self.OUTPUT_SIZE)
+        else:
+            extracted_feature = process_image(yunet=self.yunet, feature_list=self.feature_list, input=bgr,
+                                input_size=self.INPUT_SIZE, output_size=self.OUTPUT_SIZE)
 
         # Should never come up, screen for this when prepping data.
         if extracted_feature is None or extracted_feature.size == 0:
-            print('FacialRegionWrapper could not find feature!')
+            print('*WARNING* FacialRegionWrapper could not find feature! Returning full image.')
             return image
         
         return Image.fromarray(cv.cvtColor(extracted_feature, cv.COLOR_BGR2RGB))
@@ -216,8 +228,8 @@ class FacialRegionExtractor:
             None: Nothing, if the image could not be read.
         """
 
-        return process_image(self.yunet, feature, input,
-                             self.input_size, self.output_size)
+        return process_image(yunet=self.yunet, feature=feature, input=input,
+                             input_size=self.input_size, output_size=self.output_size)
 
     def process_image_from_path(self, feature, input) -> np.ndarray | None:
         """Returns the input image, cropped to feature.
@@ -307,10 +319,24 @@ if __name__ == "__main__":
     rgb_image = cv.cvtColor(img_original, cv.COLOR_BGR2RGB)
     pil_image = Image.fromarray(rgb_image)
 
-    for i in range(0, feature_count):
+    # for i in range(0, feature_count):
         # img = process_image(yunet=yunet, feature=i, input=img_original)
-        frw = FacialRegionWrapper(yunet, i)
-        frw(pil_image)
-        # cv.imshow(f'img_feature_{i}', img)
+        # frw = FacialRegionWrapper(yunet, i)
+        # img = frw(pil_image)
+        # img.show()
         # cv.imwrite(f'test/img_feature_{i}.jpg', img)
-        # cv.waitKey(0)
+
+    frw = FacialRegionWrapper(yunet, -1)
+    img = frw(pil_image)
+    # img = process_image(yunet=yunet, feature_list=[0,1,2,3,4,5], input=img_original)
+    # cv.imshow(f'img_featurelist', img)
+    # cv.waitKey(0)
+    img.save('full.png')
+
+    frw = FacialRegionWrapper(yunet, 2, [0,1,3])
+    img = frw(pil_image)
+    # img = process_image(yunet=yunet, feature_list=[0,1,2,3,4,5], input=img_original)
+    # cv.imshow(f'img_featurelist', img)
+    # cv.waitKey(0)
+    img.save('flist.png')
+    # img.show()
